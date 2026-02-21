@@ -54,31 +54,6 @@ const CURVES: { xFn: (t: number) => number; yFn: (t: number) => number; tRange: 
   { xFn: t => 0, yFn: t => t, tRange: [-3, 3] },
 ];
 
-// --- Timeline ---
-// 0–3:     Title card
-// 3–10:    Polynomial ring labels + example polys
-// 10–30:   Homomorphism f : R[x,y] → R[t]
-//   10–14:   Type signature appears
-//   14–19:   Constants map to themselves
-//   19–30:   Mapping examples cycle
-// 30–40:   Parametric curve plotting
-
-const CAPTIONS: [number, number, string][] = [
-  [3, 5, "Let's talk about real polynomial rings."],
-  [5, 7.5, "The elements of one of these rings\nare all the polynomials we can write down"],
-  [7.5, 10, "over a particular set of variables,\nwith real coefficients."],
-  [10, 12.5, "What are the nice functions\nbetween these rings?"],
-  [12.5, 14, "Let's consider an example."],
-  [14, 16.5, "What are some nice functions\nfrom R[x,y] to R[t]?"],
-  [16.5, 19, "Let's say that we want to only\nmap constants to themselves."],
-  [19, 22, "If we demand that f is a ring homomorphism,\nthen the only freedom we have left"],
-  [22, 25, "is deciding what x and y\nget mapped to."],
-  [25, 28, "A nice function from R[x,y] to R[t]\namounts to making only two choices:"],
-  [28, 30, "choosing a polynomial in t for x,\nand another for y."],
-  [30, 33.5, "This is the same thing as\ndescribing a parameterized curve in the plane."],
-  [33.5, 37, "We're giving for each time t a function\nthat tells us what the x and y values should be."],
-];
-
 export const config: AnimationConfig = {
   width: 1920,
   height: 1080,
@@ -96,6 +71,26 @@ export async function setup(): Promise<void> {
   ]);
 }
 
+// ---------------------------------------------------------------------------
+// Scene types
+// ---------------------------------------------------------------------------
+
+type SceneDraw = (
+  ctx: CanvasRenderingContext2D,
+  localT: number,
+  env: { width: number; height: number; duration: number },
+) => void | Promise<void>;
+
+interface SceneEntry {
+  start: number;
+  draw: SceneDraw;
+  captions?: { start: number; end: number; text: string }[];
+}
+
+// ---------------------------------------------------------------------------
+// Helpers
+// ---------------------------------------------------------------------------
+
 async function drawTexCentered(
   ctx: CanvasRenderingContext2D, expr: string, cx: number, cy: number, scale: number,
 ) {
@@ -105,11 +100,17 @@ async function drawTexCentered(
   await tex.draw(ctx, expr, cx - w / 2, cy - h / 2, scale);
 }
 
-function drawCC(ctx: CanvasRenderingContext2D, t: number, width: number, height: number) {
+function drawCC(
+  ctx: CanvasRenderingContext2D,
+  localT: number,
+  captions: { start: number; end: number; text: string }[],
+  width: number,
+  height: number,
+) {
   if (!SHOW_CC) return;
-  const caption = CAPTIONS.find(([start, end]) => t >= start && t < end);
+  const caption = captions.find(c => localT >= c.start && localT < c.end);
   if (!caption) return;
-  const text = caption[2];
+  const text = caption.text;
   const lines = text.split('\n');
 
   ctx.font = '36px Roboto, sans-serif';
@@ -227,16 +228,14 @@ function drawParametricCurve(
   ctx.stroke();
 }
 
-export const animate: AnimationFn = async (ctx, t) => {
-  const { width, height } = config;
+// ---------------------------------------------------------------------------
+// Scene factories
+// ---------------------------------------------------------------------------
 
-  ctx.fillStyle = '#faf5e7';
-  ctx.fillRect(0, 0, width, height);
-
-  // --- Title card (0–3s) ---
-  if (t < 3) {
-    const fadeIn = easeInOut(timeSlice(t, 0, FADE));
-    const fadeOut = 1 - easeInOut(timeSlice(t, 3 - FADE, 3));
+function titleScene(): SceneDraw {
+  return async (ctx, localT, { width, height, duration }) => {
+    const fadeIn = easeInOut(timeSlice(localT, 0, FADE));
+    const fadeOut = 1 - easeInOut(timeSlice(localT, duration - FADE, duration));
     const alpha = Math.min(fadeIn, fadeOut);
     if (alpha > 0) {
       ctx.globalAlpha = alpha;
@@ -249,11 +248,12 @@ export const animate: AnimationFn = async (ctx, t) => {
       ctx.fillText(SUBTITLE, width / 2, height / 2 + 40);
       ctx.globalAlpha = 1;
     }
-  }
+  };
+}
 
-  // --- Ring labels + example polys (3–10s) ---
-  if (t >= 3 && t < 10.5) {
-    const phaseOut = 1 - easeInOut(timeSlice(t, 10, 10 + FADE));
+function ringsScene(cues: { labels: number; polys: number }): SceneDraw {
+  return async (ctx, localT, { width, height, duration }) => {
+    const phaseOut = 1 - easeInOut(timeSlice(localT, duration, duration + FADE));
     const scale = 3.5;
     const gap = 200;
 
@@ -271,10 +271,10 @@ export const animate: AnimationFn = async (ctx, t) => {
       xPos += widths[i] + gap;
     }
 
-    // Ring labels appear one by one (3.5–5s)
-    const LABEL_APPEAR = [3.5, 4.0, 4.5, 5.0];
+    // Ring labels appear one by one (staggered from cues.labels)
+    const LABEL_APPEAR = [cues.labels, cues.labels + 0.5, cues.labels + 1, cues.labels + 1.5];
     for (let i = 0; i < RING_LABELS.length; i++) {
-      const fadeIn = easeInOut(timeSlice(t, LABEL_APPEAR[i], LABEL_APPEAR[i] + FADE));
+      const fadeIn = easeInOut(timeSlice(localT, LABEL_APPEAR[i], LABEL_APPEAR[i] + FADE));
       const alpha = fadeIn * phaseOut;
       if (alpha > 0) {
         ctx.globalAlpha = alpha;
@@ -283,15 +283,15 @@ export const animate: AnimationFn = async (ctx, t) => {
       }
     }
 
-    // Example polys appear underneath (6–8s)
+    // Example polys appear underneath (staggered from cues.polys)
     const polyScale = 2.5;
-    const polyStartTimes = [6.0, 6.5, 7.0];
+    const polyStartTimes = [cues.polys, cues.polys + 0.5, cues.polys + 1];
     for (let g = 0; g < POLY_GROUPS.length; g++) {
       const polys = POLY_GROUPS[g];
       const cx = labelCenterX[g];
       for (let j = 0; j < polys.length; j++) {
         const appearT = polyStartTimes[g] + j * 0.4;
-        const fadeIn = easeInOut(timeSlice(t, appearT, appearT + FADE));
+        const fadeIn = easeInOut(timeSlice(localT, appearT, appearT + FADE));
         const alpha = fadeIn * phaseOut;
         if (alpha > 0) {
           ctx.globalAlpha = alpha;
@@ -300,13 +300,14 @@ export const animate: AnimationFn = async (ctx, t) => {
         }
       }
     }
-  }
+  };
+}
 
-  // --- Homomorphism: f : R[x,y] → R[t] (10–30s) ---
-  if (t >= 10 && t < 30 + FADE) {
-    // Type signature: fades in at 10.5, persists, fades out at end
-    const fTypeIn = easeInOut(timeSlice(t, 10.5, 10.5 + FADE));
-    const fTypeOut = 1 - easeInOut(timeSlice(t, 30 - FADE, 30));
+function homomorphismScene(cues: { typeSig: number; constants: number; mappings: number }): SceneDraw {
+  return async (ctx, localT, { width, height, duration }) => {
+    // Type signature: fades in at cues.typeSig, fades out at duration
+    const fTypeIn = easeInOut(timeSlice(localT, cues.typeSig, cues.typeSig + FADE));
+    const fTypeOut = 1 - easeInOut(timeSlice(localT, duration - FADE, duration));
     const fAlpha = Math.min(fTypeIn, fTypeOut);
     if (fAlpha > 0) {
       ctx.globalAlpha = fAlpha;
@@ -314,12 +315,12 @@ export const animate: AnimationFn = async (ctx, t) => {
       ctx.globalAlpha = 1;
     }
 
-    // Constants: f(0)=0, f(-3)=-3, f(100/7)=100/7 (17–19.5s)
-    if (t >= 17 && t < 19.5) {
-      const constOut = 1 - easeInOut(timeSlice(t, 19, 19 + FADE));
-      const constTimes = [17.2, 17.6, 18.0];
+    // Constants: f(0)=0, f(-3)=-3, f(100/7)=100/7
+    if (localT >= cues.constants && localT < cues.mappings) {
+      const constOut = 1 - easeInOut(timeSlice(localT, cues.mappings - 0.5, cues.mappings - 0.5 + FADE));
+      const constTimes = [cues.constants + 0.2, cues.constants + 0.6, cues.constants + 1.0];
       for (let i = 0; i < CONST_EXPRS.length; i++) {
-        const fadeIn = easeInOut(timeSlice(t, constTimes[i], constTimes[i] + FADE));
+        const fadeIn = easeInOut(timeSlice(localT, constTimes[i], constTimes[i] + FADE));
         const alpha = fadeIn * constOut;
         if (alpha > 0) {
           ctx.globalAlpha = alpha;
@@ -329,8 +330,8 @@ export const animate: AnimationFn = async (ctx, t) => {
       }
     }
 
-    // Mapping examples cycle (19.5–30s)
-    if (t >= 19.5 && t < 30 + FADE) {
+    // Mapping examples cycle (from cues.mappings to duration)
+    if (localT >= cues.mappings && localT < duration + FADE) {
       const exampleDur = 2.5;
       const crossFade = 0.3;
       const mapScale = 3.5;
@@ -350,8 +351,8 @@ export const animate: AnimationFn = async (ctx, t) => {
       const yBaselineY = height / 2 + 100;
 
       // Persistent prefixes: x ↦ and y ↦ (baseline-aligned)
-      const prefixIn = easeInOut(timeSlice(t, 19.5, 19.5 + crossFade));
-      const prefixOut = 1 - easeInOut(timeSlice(t, 30 - FADE, 30));
+      const prefixIn = easeInOut(timeSlice(localT, cues.mappings, cues.mappings + crossFade));
+      const prefixOut = 1 - easeInOut(timeSlice(localT, duration - FADE, duration));
       const prefixAlpha = Math.min(prefixIn, prefixOut);
       if (prefixAlpha > 0) {
         ctx.globalAlpha = prefixAlpha;
@@ -363,15 +364,15 @@ export const animate: AnimationFn = async (ctx, t) => {
       // Cycling RHS values (baseline-aligned to same rows)
       for (let i = 0; i < MAPPING_RHS.length; i++) {
         const [xRhs, yRhs] = MAPPING_RHS[i];
-        const start = 19.5 + i * exampleDur;
+        const start = cues.mappings + i * exampleDur;
         const end = start + exampleDur;
 
-        if (t < start || t > end + crossFade) continue;
+        if (localT < start || localT > end + crossFade) continue;
 
-        const fadeIn = easeInOut(timeSlice(t, start, start + crossFade));
+        const fadeIn = easeInOut(timeSlice(localT, start, start + crossFade));
         const fadeOut = (i < MAPPING_RHS.length - 1)
-          ? 1 - easeInOut(timeSlice(t, end - crossFade, end))
-          : 1 - easeInOut(timeSlice(t, 30 - FADE, 30));
+          ? 1 - easeInOut(timeSlice(localT, end - crossFade, end))
+          : 1 - easeInOut(timeSlice(localT, duration - FADE, duration));
         const alpha = Math.min(fadeIn, fadeOut);
 
         if (alpha > 0) {
@@ -384,12 +385,13 @@ export const animate: AnimationFn = async (ctx, t) => {
         }
       }
     }
-  }
+  };
+}
 
-  // --- Parametric curve plotting (30–40s) ---
-  if (t >= 30.5 && t < 40 + FADE) {
-    const sectionIn = easeInOut(timeSlice(t, 30.5, 30.5 + FADE));
-    const sectionOut = 1 - easeInOut(timeSlice(t, 40 - FADE, 40));
+function parametricScene(cues: { plotStart: number }): SceneDraw {
+  return async (ctx, localT, { width, height, duration }) => {
+    const sectionIn = easeInOut(timeSlice(localT, cues.plotStart, cues.plotStart + FADE));
+    const sectionOut = 1 - easeInOut(timeSlice(localT, duration - FADE, duration));
     const sectionAlpha = Math.min(sectionIn, sectionOut);
 
     if (sectionAlpha > 0) {
@@ -432,15 +434,15 @@ export const animate: AnimationFn = async (ctx, t) => {
       // Cycling through curves
       for (let i = 0; i < MAPPING_RHS.length; i++) {
         const [xRhs, yRhs] = MAPPING_RHS[i];
-        const start = 30.5 + i * exampleDur;
+        const start = cues.plotStart + i * exampleDur;
         const end = start + exampleDur;
 
-        if (t < start || t > end + crossFade) continue;
+        if (localT < start || localT > end + crossFade) continue;
 
-        const fadeIn = easeInOut(timeSlice(t, start, start + crossFade));
+        const fadeIn = easeInOut(timeSlice(localT, start, start + crossFade));
         const fadeOut = (i < MAPPING_RHS.length - 1)
-          ? 1 - easeInOut(timeSlice(t, end - crossFade, end))
-          : 1 - easeInOut(timeSlice(t, 40 - FADE, 40));
+          ? 1 - easeInOut(timeSlice(localT, end - crossFade, end))
+          : 1 - easeInOut(timeSlice(localT, duration - FADE, duration));
         const alpha = Math.min(fadeIn, fadeOut) * sectionAlpha;
 
         if (alpha > 0) {
@@ -459,8 +461,71 @@ export const animate: AnimationFn = async (ctx, t) => {
 
       ctx.globalAlpha = 1;
     }
-  }
+  };
+}
 
-  // --- Closed captions (drawn last, on top) ---
-  drawCC(ctx, t, width, height);
+// ---------------------------------------------------------------------------
+// Timeline — all timing data in one place
+// ---------------------------------------------------------------------------
+
+const TIMELINE: SceneEntry[] = [
+  {
+    start: 0,
+    draw: titleScene(),
+  },
+  {
+    start: 3,
+    draw: ringsScene({ labels: 0.5, polys: 3 }),
+    captions: [
+      { start: 0, end: 2, text: "Let's talk about real polynomial rings." },
+      { start: 2, end: 4.5, text: "The elements of one of these rings\nare all the polynomials we can write down" },
+      { start: 4.5, end: 7, text: "over a particular set of variables,\nwith real coefficients." },
+    ],
+  },
+  {
+    start: 10,
+    draw: homomorphismScene({ typeSig: 0.5, constants: 7, mappings: 9.5 }),
+    captions: [
+      { start: 0, end: 2.5, text: "What are the nice functions\nbetween these rings?" },
+      { start: 2.5, end: 4, text: "Let's consider an example." },
+      { start: 4, end: 6.5, text: "What are some nice functions\nfrom R[x,y] to R[t]?" },
+      { start: 6.5, end: 9, text: "Let's say that we want to only\nmap constants to themselves." },
+      { start: 9, end: 12, text: "If we demand that f is a ring homomorphism,\nthen the only freedom we have left" },
+      { start: 12, end: 15, text: "is deciding what x and y\nget mapped to." },
+      { start: 15, end: 18, text: "A nice function from R[x,y] to R[t]\namounts to making only two choices:" },
+      { start: 18, end: 20, text: "choosing a polynomial in t for x,\nand another for y." },
+    ],
+  },
+  {
+    start: 30,
+    draw: parametricScene({ plotStart: 0.5 }),
+    captions: [
+      { start: 0, end: 3.5, text: "This is the same thing as\ndescribing a parameterized curve in the plane." },
+      { start: 3.5, end: 7, text: "We're giving for each time t a function\nthat tells us what the x and y values should be." },
+    ],
+  },
+];
+
+// ---------------------------------------------------------------------------
+// Main animation — scene dispatcher
+// ---------------------------------------------------------------------------
+
+const { width, height } = config;
+
+export const animate: AnimationFn = async (ctx, t) => {
+  ctx.fillStyle = '#faf5e7';
+  ctx.fillRect(0, 0, width, height);
+
+  for (let i = 0; i < TIMELINE.length; i++) {
+    const entry = TIMELINE[i];
+    const duration = (i < TIMELINE.length - 1 ? TIMELINE[i + 1].start : config.duration) - entry.start;
+    const localT = t - entry.start;
+    if (localT >= 0 && localT < duration + FADE) {
+      await entry.draw(ctx, localT, { width, height, duration });
+    }
+    // captions
+    if (entry.captions && localT >= 0 && localT < duration) {
+      drawCC(ctx, localT, entry.captions, width, height);
+    }
+  }
 };
