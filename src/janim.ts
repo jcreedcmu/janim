@@ -9,7 +9,7 @@ import { AllPackages } from 'mathjax-full/js/input/tex/AllPackages.js';
 // Types
 // ---------------------------------------------------------------------------
 
-export type AnimationFn = (ctx: CanvasRenderingContext2D, t: number) => void;
+export type AnimationFn = (ctx: CanvasRenderingContext2D, t: number) => void | Promise<void>;
 
 export interface AnimationConfig {
   width: number;
@@ -27,9 +27,6 @@ type ImageLike = HTMLImageElement | { width: number; height: number };
 // 1 ex ≈ 8px at default MathJax font size — tunable
 const EX_TO_PX = 8;
 
-// Rasterize SVGs at this multiple of logical size so they stay sharp when scaled up
-const SVG_RASTER_SCALE = 16;
-
 function parseDimension(value: string): number {
   const n = parseFloat(value);
   if (value.endsWith('ex')) return n * EX_TO_PX;
@@ -37,8 +34,19 @@ function parseDimension(value: string): number {
   return n;
 }
 
+interface TexCacheEntry {
+  // Raw SVG template with %WIDTH% and %HEIGHT% placeholders for dimensions
+  svgTemplate: string;
+  width: number;
+  height: number;
+  // Browser: pre-loaded Image (browser re-rasterizes SVG at draw size)
+  browserImage?: ImageLike;
+  // Node: loadImage function, cached at import time
+  nodeLoadImage?: (src: Buffer) => Promise<ImageLike>;
+}
+
 export class TexRenderer {
-  private cache = new Map<string, { image: ImageLike; width: number; height: number }>();
+  private cache = new Map<string, TexCacheEntry>();
   private adaptor = liteAdaptor();
   private html: ReturnType<typeof mathjax.document>;
 
@@ -49,7 +57,7 @@ export class TexRenderer {
     this.html = mathjax.document('', { InputJax: tex, OutputJax: svg });
   }
 
-  private texToSvg(expression: string): { svgString: string; width: number; height: number } {
+  private texToSvg(expression: string): { svgTemplate: string; width: number; height: number } {
     const node = this.html.convert(expression, { display: true });
     // innerHTML strips the <mjx-container> wrapper, giving us just the <svg>
     let svgString = this.adaptor.innerHTML(node);
@@ -57,22 +65,18 @@ export class TexRenderer {
     // Replace currentColor with white so it renders visibly in an <img> context
     svgString = svgString.replace(/currentColor/g, '#ffffff');
 
-    // Extract dimensions and convert ex → px in the SVG attributes so that
-    // renderers that don't understand ex units (e.g. resvg in @napi-rs/canvas)
-    // still produce correctly-sized images.
+    // Extract logical dimensions (ex → px)
     const widthMatch = svgString.match(/width="([^"]+)"/);
     const heightMatch = svgString.match(/height="([^"]+)"/);
     const width = widthMatch ? parseDimension(widthMatch[1]) : 100;
     const height = heightMatch ? parseDimension(heightMatch[1]) : 50;
 
-    // Rasterize at a high resolution so scaling up in drawImage stays sharp.
-    // The viewBox preserves the vector coordinates; we just inflate width/height.
-    const rasterWidth = width * SVG_RASTER_SCALE;
-    const rasterHeight = height * SVG_RASTER_SCALE;
-    if (widthMatch) svgString = svgString.replace(`width="${widthMatch[1]}"`, `width="${rasterWidth}px"`);
-    if (heightMatch) svgString = svgString.replace(`height="${heightMatch[1]}"`, `height="${rasterHeight}px"`);
+    // Replace dimensions with placeholders so we can stamp in the exact
+    // target pixel size at draw time (avoids any raster rescaling).
+    if (widthMatch) svgString = svgString.replace(`width="${widthMatch[1]}"`, `width="%WIDTH%"`);
+    if (heightMatch) svgString = svgString.replace(`height="${heightMatch[1]}"`, `height="%HEIGHT%"`);
 
-    return { svgString, width, height };
+    return { svgTemplate: svgString, width, height };
   }
 
   async prepare(expressions: string[]): Promise<void> {
@@ -81,16 +85,19 @@ export class TexRenderer {
     for (const expr of expressions) {
       if (this.cache.has(expr)) continue;
 
-      const { svgString, width, height } = this.texToSvg(expr);
+      const { svgTemplate, width, height } = this.texToSvg(expr);
+      const entry: TexCacheEntry = { svgTemplate, width, height };
 
       if (isNode) {
-        // Node.js: use @napi-rs/canvas loadImage with a Buffer
         const { loadImage } = await import('@napi-rs/canvas');
-        const buf = Buffer.from(svgString, 'utf-8');
-        const img = await loadImage(buf);
-        this.cache.set(expr, { image: img as any, width, height });
+        entry.nodeLoadImage = loadImage as any;
       } else {
-        // Browser: data URL + <img>
+        // Browser: load an image with the logical dimensions.
+        // The browser re-rasterizes SVG at whatever size drawImage requests,
+        // so we don't need per-frame loading.
+        const svgString = svgTemplate
+          .replace('%WIDTH%', `${width}px`)
+          .replace('%HEIGHT%', `${height}px`);
         const img = new Image();
         const dataUrl = 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(svgString);
         await new Promise<void>((resolve, reject) => {
@@ -98,23 +105,38 @@ export class TexRenderer {
           img.onerror = (e) => reject(e);
           img.src = dataUrl;
         });
-        this.cache.set(expr, { image: img, width, height });
+        entry.browserImage = img;
       }
+
+      this.cache.set(expr, entry);
     }
   }
 
-  draw(
+  async draw(
     ctx: CanvasRenderingContext2D,
     tex: string,
     x: number,
     y: number,
     scale: number = 1,
-  ): void {
+  ): Promise<void> {
     const entry = this.cache.get(tex);
     if (!entry) throw new Error(`TeX not prepared: "${tex}". Call prepare() first.`);
+
     const w = entry.width * scale;
     const h = entry.height * scale;
-    ctx.drawImage(entry.image as any, x, y, w, h);
+
+    if (entry.browserImage) {
+      // Browser: drawImage with target size — browser re-rasterizes the SVG
+      ctx.drawImage(entry.browserImage as any, x, y, w, h);
+    } else if (entry.nodeLoadImage) {
+      // Node: rasterize SVG at exact target pixel size, then draw 1:1
+      const svgString = entry.svgTemplate
+        .replace('%WIDTH%', `${w}px`)
+        .replace('%HEIGHT%', `${h}px`);
+      const buf = Buffer.from(svgString, 'utf-8');
+      const img = await entry.nodeLoadImage(buf);
+      ctx.drawImage(img as any, x, y);
+    }
   }
 
   measure(tex: string): { width: number; height: number } {
@@ -139,13 +161,13 @@ export function runInBrowser(
   const duration = config.duration;
   let startTime: number | null = null;
 
-  function frame(timestamp: number) {
+  async function frame(timestamp: number) {
     if (startTime === null) startTime = timestamp;
     const elapsed = (timestamp - startTime) / 1000;
     const t = Math.min(elapsed, duration);
 
     ctx.clearRect(0, 0, config.width, config.height);
-    animFn(ctx, t);
+    await animFn(ctx, t);
 
     if (t < duration) {
       requestAnimationFrame(frame);
@@ -177,9 +199,8 @@ export async function renderToFrames(
   for (let i = 0; i <= totalFrames; i++) {
     const t = i / fps;
 
-    // Clear
     (ctx as any).clearRect(0, 0, config.width, config.height);
-    animFn(ctx, t);
+    await animFn(ctx, t);
 
     const buf = canvas.toBuffer('image/png');
     const framePath = path.join(config.outDir, `frame_${String(i).padStart(5, '0')}.png`);

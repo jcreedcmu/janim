@@ -16,7 +16,7 @@ export async function setup(): Promise<void> {
   await tex.prepare([TEX_EMC2, TEX_INTEGRAL]);
 }
 
-export const animate: AnimationFn = (ctx, t) => {
+export const animate: AnimationFn = async (ctx, t) => {
   const { width, height } = config;
 
   // Dark background
@@ -31,7 +31,7 @@ export const animate: AnimationFn = (ctx, t) => {
     const size = tex.measure(TEX_EMC2);
     const w = size.width * scale;
     const h = size.height * scale;
-    tex.draw(ctx, TEX_EMC2, (width - w) / 2, (height - h) / 2 - 60, scale);
+    await tex.draw(ctx, TEX_EMC2, (width - w) / 2, (height - h) / 2 - 60, scale);
     ctx.globalAlpha = 1;
   }
 
@@ -66,7 +66,7 @@ export const animate: AnimationFn = (ctx, t) => {
     const targetX = (width - w) / 2;
     const startX = width + 20;
     const x = lerp(startX, targetX, p3);
-    tex.draw(ctx, TEX_INTEGRAL, x, (height - h) / 2 + 80, scale);
+    await tex.draw(ctx, TEX_INTEGRAL, x, (height - h) / 2 + 80, scale);
     ctx.globalAlpha = 1;
   }
 };
