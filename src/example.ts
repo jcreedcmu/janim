@@ -84,13 +84,13 @@ export const PROJ_DISTANCE = 10;
 export const PROJ_ROTATION_SPEED = 0.15; // radians per second
 
 // --- Duality / conclusion ---
-const DUALITY_2D = `\\mathbb{R}[${X},${Y}] \\to \\mathbb{R}[${T}] \\quad\\longleftrightarrow\\quad \\text{curves in } \\mathbb{R}^2`;
-const DUALITY_3D = `\\mathbb{R}[${X},${Y},${Z}] \\to \\mathbb{R}[${T}] \\quad\\longleftrightarrow\\quad \\text{curves in } \\mathbb{R}^3`;
+const DUALITY_2D = `\\mathbb{R}[${X},${Y}] \\to \\mathbb{R}[${T}] \\quad\\cssId{arr}{\\longleftrightarrow}\\quad \\text{polynomial curves in } \\mathbb{R}^2`;
+const DUALITY_3D = `\\mathbb{R}[${X},${Y},${Z}] \\to \\mathbb{R}[${T}] \\quad\\cssId{arr}{\\longleftrightarrow}\\quad \\text{polynomial curves in } \\mathbb{R}^3`;
 const N = '{\\color{#b100d1}{n}}';
 const P = '{\\color{#00b2bb}{p}}';
 export const N_COLOR = '#b100d1';
 export const P_COLOR = '#00b2bb';
-const DUALITY_GENERAL = `\\mathbb{R}[${X}_1,\\ldots,${X}_{\\cssId{n1}{${N}}}] \\to \\mathbb{R}[${T}_1,\\ldots,${T}_{\\cssId{p1}{${P}}}] \\quad\\longleftrightarrow\\quad \\mathbb{R}^{\\cssId{p2}{${P}}} \\to \\mathbb{R}^{\\cssId{n2}{${N}}}`;
+const DUALITY_GENERAL = `\\mathbb{R}[${X}_1,\\ldots,${X}_{\\cssId{n1}{${N}}}] \\to \\mathbb{R}[${T}_1,\\ldots,${T}_{\\cssId{p1}{${P}}}] \\quad\\cssId{arr}{\\longleftrightarrow}\\quad \\text{polynomial maps } \\mathbb{R}^{\\cssId{p2}{${P}}} \\to \\mathbb{R}^{\\cssId{n2}{${N}}}`;
 const DUALITY_CLOSING_EXPR = `\\text{algebra} \\quad\\longleftrightarrow\\quad \\text{geometry}`;
 export const DUALITY_ROWS = [DUALITY_2D, DUALITY_3D, DUALITY_GENERAL];
 export const DUALITY_CLOSING = DUALITY_CLOSING_EXPR;

@@ -406,7 +406,7 @@ export function dualityScene(): SceneDraw {
 
     const tableOut = 1 - easeInOut(timeSlice(localT, tableFadeOut - 0.3, tableFadeOut));
 
-    // Progressive table of correspondences
+    // Progressive table of correspondences, aligned on the \longleftrightarrow
     for (let i = 0; i < DUALITY_ROWS.length; i++) {
       if (localT < rowAppear[i]) continue;
       const fadeIn = easeInOut(timeSlice(localT, rowAppear[i], rowAppear[i] + 0.3));
@@ -414,16 +414,20 @@ export function dualityScene(): SceneDraw {
       if (alpha <= 0) continue;
 
       ctx.globalAlpha = alpha;
+      const expr = DUALITY_ROWS[i];
+      const size = tex.measure(expr);
       const cy = height / 2 + (i - 1) * rowGap;
-      await drawTexCentered(ctx, DUALITY_ROWS[i], width / 2, cy, rowScale);
+
+      // Find the arrow marker and offset so it aligns at width/2
+      const arrMarker = tex.markerPositions(expr, ['arr']).get('arr');
+      const arrowOffsetX = arrMarker ? arrMarker.x * rowScale : (size.width * rowScale) / 2;
+      const contentLeft = width / 2 - arrowOffsetX;
+      const contentTop = cy - (size.height * rowScale) / 2;
+      await tex.draw(ctx, expr, contentLeft, contentTop, rowScale);
 
       // Bezier arrows on the general row (row 2) linking matching n's and p's
       if (i === 2) {
-        const expr = DUALITY_ROWS[2];
         const markers = tex.markerPositions(expr, ['n1', 'p1', 'p2', 'n2']);
-        const size = tex.measure(expr);
-        const contentLeft = width / 2 - (size.width * rowScale) / 2;
-        const contentTop = cy - (size.height * rowScale) / 2;
 
         const toCanvas = (id: string) => {
           const m = markers.get(id)!;
