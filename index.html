@@ -18,9 +18,9 @@
       font-family: system-ui, sans-serif;
       color: #ccc;
     }
-    canvas {
+    #canvas {
       width: 100vw;
-      height: calc(100vh - 50px);
+      height: calc(100vh - 110px);
       object-fit: contain;
     }
     #controls {
@@ -30,10 +30,11 @@
       right: 0;
       display: flex;
       align-items: center;
-      justify-content: center;
       gap: 15px;
-      padding: 12px;
+      padding: 8px 12px;
       background: rgba(0, 0, 0, 0.7);
+      height: 100px;
+      box-sizing: border-box;
     }
     #controls button {
       background: none;
@@ -47,9 +48,10 @@
       text-align: center;
     }
     #controls button:hover { color: #fff; }
-    #scrubber {
-      width: 450px;
-      accent-color: #e94560;
+    #waveform {
+      flex: 1;
+      height: 84px;
+      cursor: pointer;
     }
     #time-display {
       font-size: 19.5px;
@@ -60,10 +62,11 @@
 </head>
 <body>
   <canvas id="canvas"></canvas>
+  <audio id="audio" src="/audio/untitled.wav" preload="auto"></audio>
   <div id="controls">
     <button id="restart">&#x23EE;&#xFE0E;</button>
     <button id="play-pause">&#x23F8;&#xFE0E;</button>
-    <input type="range" id="scrubber" min="0" value="0">
+    <canvas id="waveform"></canvas>
     <span id="time-display">0.00s / 0.0s</span>
   </div>
   <script type="module" src="/src/browser.ts"></script>

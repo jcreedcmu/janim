@@ -128,7 +128,7 @@ interface SceneEntry {
   captions?: { start: number; end: number; text: string }[];
 }
 
-const TIMELINE: SceneEntry[] = [
+export const TIMELINE: SceneEntry[] = [
   {
     start: 0,
     draw: titleScene(),
