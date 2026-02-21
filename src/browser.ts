@@ -121,7 +121,8 @@ function drawWaveform(peaks: Peaks, cvs: HTMLCanvasElement, currentT: number, du
   const bubbleMargin = BUBBLE_TOP_MARGIN * dpr;
   const waveTop = WAVEFORM_TOP_MARGIN * dpr;
   const waveH = h - waveTop; // height available for the waveform
-  ctx.clearRect(0, 0, w, h);
+  ctx.fillStyle = '#222';
+  ctx.fillRect(0, 0, w, h);
 
   const playheadX = timeToX(currentT, w);
   const buckets = peaks.min.length;
