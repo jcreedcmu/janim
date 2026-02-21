@@ -54,17 +54,19 @@ const BUBBLE_FONT_SIZE = 9;
 const BUBBLE_H = 25;
 const BUBBLE_PAD = 8;
 const BUBBLE_R = 8;
-const SCENE_CUE_COLOR = 'rgba(255, 220, 100, 0.7)';
-const SUB_CUE_COLOR = 'rgba(140, 200, 255, 0.7)';
-const CUE_LINE_COLOR_SCENE = 'rgba(255, 220, 100, 0.35)';
-const CUE_LINE_COLOR_SUB = 'rgba(140, 200, 255, 0.25)';
+const SCENE_CUE_COLOR = 'rgb(255, 220, 100)';
+const SUB_CUE_COLOR = 'rgb(140, 200, 255)';
+const CUE_LINE_COLOR_SCENE = 'rgb(255, 220, 100)';
+const CUE_LINE_COLOR_SUB = 'rgb(140, 200, 255)';
 
 function isSceneCue(id: string): boolean {
   return id.startsWith('scene-');
 }
 
 const BUBBLE_ANGLE = -Math.PI / 4; // -45 degrees (up and to the right)
-const BUBBLE_TOP_MARGIN = 90; // CSS pixels reserved above waveform for angled labels
+const BUBBLE_NUDGE = 7; // CSS pixels: shift bubble right along its rotated axis
+const BUBBLE_TOP_MARGIN = 70; // CSS pixels: where cue line pivots sit
+const WAVEFORM_TOP_MARGIN = 20; // CSS pixels: where waveform bars start
 
 function drawCueMarkers(ctx: CanvasRenderingContext2D, w: number, h: number, topMargin: number, dpr: number) {
   ctx.font = `${BUBBLE_FONT_SIZE * dpr}px system-ui, sans-serif`;
@@ -79,11 +81,11 @@ function drawCueMarkers(ctx: CanvasRenderingContext2D, w: number, h: number, top
 
     const scene = isSceneCue(cue.id);
 
-    // Vertical line from top margin to bottom
+    // Vertical stem
     ctx.strokeStyle = scene ? CUE_LINE_COLOR_SCENE : CUE_LINE_COLOR_SUB;
-    ctx.lineWidth = 2 * dpr;
+    ctx.lineWidth = 3 * dpr;
     ctx.beginPath();
-    ctx.moveTo(x, topMargin);
+    ctx.moveTo(x, topMargin - 20 * dpr);
     ctx.lineTo(x, h);
     ctx.stroke();
 
@@ -95,7 +97,7 @@ function drawCueMarkers(ctx: CanvasRenderingContext2D, w: number, h: number, top
     const textW = ctx.measureText(cue.label).width;
     const bw = textW + bubblePad * 2;
 
-    const bx = 0;
+    const bx = BUBBLE_NUDGE * dpr;
     const by = -bubbleH - bubblePad;
 
     ctx.fillStyle = scene ? SCENE_CUE_COLOR : SUB_CUE_COLOR;
@@ -116,8 +118,9 @@ function drawWaveform(peaks: Peaks, cvs: HTMLCanvasElement, currentT: number, du
   const ctx = cvs.getContext('2d')!;
   const w = cvs.width;
   const h = cvs.height;
-  const topMargin = BUBBLE_TOP_MARGIN * dpr;
-  const waveH = h - topMargin; // height available for the waveform
+  const bubbleMargin = BUBBLE_TOP_MARGIN * dpr;
+  const waveTop = WAVEFORM_TOP_MARGIN * dpr;
+  const waveH = h - waveTop; // height available for the waveform
   ctx.clearRect(0, 0, w, h);
 
   const playheadX = timeToX(currentT, w);
@@ -130,21 +133,21 @@ function drawWaveform(peaks: Peaks, cvs: HTMLCanvasElement, currentT: number, du
     const minVal = Math.max(-1, peaks.min[idx] * 3);
     const maxVal = Math.min(1, peaks.max[idx] * 3);
     // Map [-1,1] within the waveform region
-    const yMin = topMargin + ((1 - maxVal) / 2) * waveH;
-    const yMax = topMargin + ((1 - minVal) / 2) * waveH;
+    const yMin = waveTop + ((1 - maxVal) / 2) * waveH;
+    const yMax = waveTop + ((1 - minVal) / 2) * waveH;
     ctx.fillStyle = px < playheadX ? '#e94560' : '#555';
     ctx.fillRect(px, yMin, 1, yMax - yMin);
   }
 
-  // Cue markers
-  drawCueMarkers(ctx, w, h, topMargin, dpr);
+  // Cue markers (pivots at bubbleMargin, lines extend to bottom)
+  drawCueMarkers(ctx, w, h, bubbleMargin, dpr);
 
   // Playhead line
   if (playheadX >= 0 && playheadX <= w) {
     ctx.strokeStyle = '#fff';
     ctx.lineWidth = 2 * dpr;
     ctx.beginPath();
-    ctx.moveTo(playheadX, topMargin);
+    ctx.moveTo(playheadX, waveTop);
     ctx.lineTo(playheadX, h);
     ctx.stroke();
   }
@@ -179,7 +182,7 @@ function hitTestCue(clientX: number, clientY: number, dpr: number): string | nul
 
     const textW = ctx.measureText(cue.label).width;
     const bw = textW + bubblePad * 2;
-    const bx = 0;
+    const bx = BUBBLE_NUDGE * dpr;
     const by = -bubbleH - bubblePad;
 
     if (lx >= bx && lx <= bx + bw && ly >= by && ly <= by + bubbleH) {
@@ -274,6 +277,7 @@ async function init() {
   let panDragging = false;
   let panLastX = 0;
   let cueDragging: string | null = null;
+  let cueDragLastX = 0;
 
   function seekFromMouse(e: MouseEvent) {
     const rect = waveformCanvas.getBoundingClientRect();
@@ -285,10 +289,13 @@ async function init() {
   function cueDragFromMouse(e: MouseEvent) {
     if (!cueDragging) return;
     const rect = waveformCanvas.getBoundingClientRect();
-    const x = Math.max(0, Math.min(e.clientX - rect.left, rect.width));
-    const t = Math.max(0, Math.min(xToTime(x * dpr, waveformCanvas.width), ctrl.duration));
-    setCue(cueDragging, t);
+    const dx = e.clientX - cueDragLastX;
+    const dtPerPx = (viewEnd - viewStart) / rect.width;
+    const dt = dx * dtPerPx;
+    const newT = Math.max(0, Math.min(getCue(cueDragging) + dt, ctrl.duration));
+    setCue(cueDragging, newT);
     rebuildTimelineInPlace();
+    cueDragLastX = e.clientX;
   }
 
   waveformCanvas.addEventListener('mousedown', (e) => {
@@ -301,6 +308,7 @@ async function init() {
       const hitCue = hitTestCue(e.clientX, e.clientY, dpr);
       if (hitCue) {
         cueDragging = hitCue;
+        cueDragLastX = e.clientX;
         syncPause();
       } else {
         // Left-click: seek/scrub
