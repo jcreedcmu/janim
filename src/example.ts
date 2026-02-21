@@ -46,6 +46,14 @@ const MAPPING_RHS: [string, string][] = [
 ];
 const ALL_RHS = MAPPING_RHS.flat();
 
+// --- Parametric curve functions (parallel to MAPPING_RHS) ---
+const CURVES: { xFn: (t: number) => number; yFn: (t: number) => number; tRange: [number, number] }[] = [
+  { xFn: t => t ** 3 + 1, yFn: t => t ** 2 - t, tRange: [-1.5, 1.5] },
+  { xFn: t => t, yFn: t => t ** 5 - t ** 4 + t ** 3 - t ** 2 + 3, tRange: [-1.2, 1.5] },
+  { xFn: t => 2 * t - 1, yFn: t => t ** 2, tRange: [-1.5, 1.5] },
+  { xFn: t => 0, yFn: t => t, tRange: [-3, 3] },
+];
+
 // --- Timeline ---
 // 0–3:     Title card
 // 3–10:    Polynomial ring labels + example polys
@@ -53,6 +61,7 @@ const ALL_RHS = MAPPING_RHS.flat();
 //   10–14:   Type signature appears
 //   14–19:   Constants map to themselves
 //   19–30:   Mapping examples cycle
+// 30–40:   Parametric curve plotting
 
 const CAPTIONS: [number, number, string][] = [
   [3, 5, "Let's talk about real polynomial rings."],
@@ -66,12 +75,14 @@ const CAPTIONS: [number, number, string][] = [
   [22, 25, "is deciding what x and y\nget mapped to."],
   [25, 28, "A nice function from R[x,y] to R[t]\namounts to making only two choices:"],
   [28, 30, "choosing a polynomial in t for x,\nand another for y."],
+  [30, 33.5, "This is the same thing as\ndescribing a parameterized curve in the plane."],
+  [33.5, 37, "We're giving for each time t a function\nthat tells us what the x and y values should be."],
 ];
 
 export const config: AnimationConfig = {
   width: 1920,
   height: 1080,
-  duration: 30,
+  duration: 40,
   fps: 30,
 };
 
@@ -81,7 +92,7 @@ export async function setup(): Promise<void> {
   await tex.prepare([
     ...RING_LABELS, ...ALL_POLYS,
     TEX_F_TYPE, ...CONST_EXPRS,
-    TEX_X_MAPSTO, TEX_Y_MAPSTO, ...ALL_RHS,
+    TEX_X_MAPSTO, TEX_Y_MAPSTO, ...ALL_RHS, X, Y,
   ]);
 }
 
@@ -117,6 +128,103 @@ function drawCC(ctx: CanvasRenderingContext2D, t: number, width: number, height:
   for (let i = 0; i < lines.length; i++) {
     ctx.fillText(lines[i], width / 2, boxY + padding + (i + 1) * lineHeight);
   }
+}
+
+// --- Parametric plot drawing ---
+
+interface PlotRect { x: number; y: number; w: number; h: number }
+
+// Precompute a fixed viewport that fits all curves
+function computeFixedViewport(): { minX: number; maxX: number; minY: number; maxY: number } {
+  const N = 200;
+  let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity;
+  for (const { xFn, yFn, tRange } of CURVES) {
+    for (let i = 0; i <= N; i++) {
+      const t = tRange[0] + (tRange[1] - tRange[0]) * (i / N);
+      const x = xFn(t), y = yFn(t);
+      if (x < minX) minX = x;
+      if (x > maxX) maxX = x;
+      if (y < minY) minY = y;
+      if (y > maxY) maxY = y;
+    }
+  }
+  if (maxX - minX < 0.01) { minX -= 1; maxX += 1; }
+  if (maxY - minY < 0.01) { minY -= 1; maxY += 1; }
+  const mx = (maxX - minX) * 0.15;
+  const my = (maxY - minY) * 0.15;
+  return { minX: minX - mx, maxX: maxX + mx, minY: minY - my, maxY: maxY + my };
+}
+
+const VIEWPORT = computeFixedViewport();
+
+function plotToCanvas(plotRect: PlotRect) {
+  const { minX, maxX, minY, maxY } = VIEWPORT;
+  return {
+    toCanvasX: (v: number) => plotRect.x + ((v - minX) / (maxX - minX)) * plotRect.w,
+    toCanvasY: (v: number) => plotRect.y + plotRect.h - ((v - minY) / (maxY - minY)) * plotRect.h,
+  };
+}
+
+async function drawPlotAxes(ctx: CanvasRenderingContext2D, plotRect: PlotRect) {
+  const { minX, maxX, minY, maxY } = VIEWPORT;
+  const { toCanvasX, toCanvasY } = plotToCanvas(plotRect);
+
+  ctx.strokeStyle = '#999';
+  ctx.lineWidth = 1.5;
+  if (minY <= 0 && maxY >= 0) {
+    const y0 = toCanvasY(0);
+    ctx.beginPath();
+    ctx.moveTo(plotRect.x, y0);
+    ctx.lineTo(plotRect.x + plotRect.w, y0);
+    ctx.stroke();
+  }
+  if (minX <= 0 && maxX >= 0) {
+    const x0 = toCanvasX(0);
+    ctx.beginPath();
+    ctx.moveTo(x0, plotRect.y);
+    ctx.lineTo(x0, plotRect.y + plotRect.h);
+    ctx.stroke();
+  }
+
+  const labelScale = 2.5;
+  if (minY <= 0 && maxY >= 0) {
+    const y0 = toCanvasY(0);
+    const xm = tex.measure(X);
+    await tex.draw(ctx, X, plotRect.x + plotRect.w - xm.width * labelScale - 8, y0 - xm.height * labelScale - 4, labelScale);
+  }
+  if (minX <= 0 && maxX >= 0) {
+    const x0 = toCanvasX(0);
+    await tex.draw(ctx, Y, x0 + 6, plotRect.y + 4, labelScale);
+  }
+}
+
+function drawParametricCurve(
+  ctx: CanvasRenderingContext2D,
+  curve: typeof CURVES[number],
+  plotRect: PlotRect,
+) {
+  const { xFn, yFn, tRange } = curve;
+  const N = 200;
+  const { toCanvasX, toCanvasY } = plotToCanvas(plotRect);
+
+  const xs: number[] = [];
+  const ys: number[] = [];
+  for (let i = 0; i <= N; i++) {
+    const t = tRange[0] + (tRange[1] - tRange[0]) * (i / N);
+    xs.push(xFn(t));
+    ys.push(yFn(t));
+  }
+
+  ctx.strokeStyle = '#3e8aff';
+  ctx.lineWidth = 3;
+  ctx.lineJoin = 'round';
+  ctx.lineCap = 'round';
+  ctx.beginPath();
+  ctx.moveTo(toCanvasX(xs[0]), toCanvasY(ys[0]));
+  for (let i = 1; i <= N; i++) {
+    ctx.lineTo(toCanvasX(xs[i]), toCanvasY(ys[i]));
+  }
+  ctx.stroke();
 }
 
 export const animate: AnimationFn = async (ctx, t) => {
@@ -195,7 +303,7 @@ export const animate: AnimationFn = async (ctx, t) => {
   }
 
   // --- Homomorphism: f : R[x,y] → R[t] (10–30s) ---
-  if (t >= 10) {
+  if (t >= 10 && t < 30 + FADE) {
     // Type signature: fades in at 10.5, persists, fades out at end
     const fTypeIn = easeInOut(timeSlice(t, 10.5, 10.5 + FADE));
     const fTypeOut = 1 - easeInOut(timeSlice(t, 30 - FADE, 30));
@@ -222,7 +330,7 @@ export const animate: AnimationFn = async (ctx, t) => {
     }
 
     // Mapping examples cycle (19.5–30s)
-    if (t >= 19.5) {
+    if (t >= 19.5 && t < 30 + FADE) {
       const exampleDur = 2.5;
       const crossFade = 0.3;
       const mapScale = 3.5;
@@ -275,6 +383,81 @@ export const animate: AnimationFn = async (ctx, t) => {
           ctx.globalAlpha = 1;
         }
       }
+    }
+  }
+
+  // --- Parametric curve plotting (30–40s) ---
+  if (t >= 30.5 && t < 40 + FADE) {
+    const sectionIn = easeInOut(timeSlice(t, 30.5, 30.5 + FADE));
+    const sectionOut = 1 - easeInOut(timeSlice(t, 40 - FADE, 40));
+    const sectionAlpha = Math.min(sectionIn, sectionOut);
+
+    if (sectionAlpha > 0) {
+      ctx.globalAlpha = sectionAlpha;
+
+      // Left side: formulas (~40% of width)
+      const mapScale = 2.5;
+      const crossFade = 0.3;
+      const exampleDur = 2.5;
+      const rhsGap = 15;
+
+      const xPrefixM = tex.measure(TEX_X_MAPSTO);
+      const yPrefixM = tex.measure(TEX_Y_MAPSTO);
+      const prefixW = Math.max(xPrefixM.width, yPrefixM.width) * mapScale;
+
+      const leftMargin = 60;
+      const leftX = leftMargin;
+      const rhsX = leftX + prefixW + rhsGap;
+
+      const xBaselineY = height / 2;
+      const yBaselineY = height / 2 + 80;
+
+      // Draw persistent prefixes
+      await tex.draw(ctx, TEX_X_MAPSTO, leftX, xBaselineY - xPrefixM.baseline * mapScale, mapScale);
+      await tex.draw(ctx, TEX_Y_MAPSTO, leftX, yBaselineY - yPrefixM.baseline * mapScale, mapScale);
+
+      // Right side: plot area (~55% of width)
+      const plotSize = 450;
+      const plotRect: PlotRect = {
+        x: width * 0.48,
+        y: (height - plotSize) / 2,
+        w: plotSize * 1.3,
+        h: plotSize,
+      };
+
+      // Draw axes at section alpha (consistent, not affected by per-curve crossfade)
+      ctx.globalAlpha = sectionAlpha;
+      await drawPlotAxes(ctx, plotRect);
+
+      // Cycling through curves
+      for (let i = 0; i < MAPPING_RHS.length; i++) {
+        const [xRhs, yRhs] = MAPPING_RHS[i];
+        const start = 30.5 + i * exampleDur;
+        const end = start + exampleDur;
+
+        if (t < start || t > end + crossFade) continue;
+
+        const fadeIn = easeInOut(timeSlice(t, start, start + crossFade));
+        const fadeOut = (i < MAPPING_RHS.length - 1)
+          ? 1 - easeInOut(timeSlice(t, end - crossFade, end))
+          : 1 - easeInOut(timeSlice(t, 40 - FADE, 40));
+        const alpha = Math.min(fadeIn, fadeOut) * sectionAlpha;
+
+        if (alpha > 0) {
+          ctx.globalAlpha = alpha;
+
+          // Draw RHS formulas
+          const xM = tex.measure(xRhs);
+          const yM = tex.measure(yRhs);
+          await tex.draw(ctx, xRhs, rhsX, xBaselineY - xM.baseline * mapScale, mapScale);
+          await tex.draw(ctx, yRhs, rhsX, yBaselineY - yM.baseline * mapScale, mapScale);
+
+          // Draw curve
+          drawParametricCurve(ctx, CURVES[i], plotRect);
+        }
+      }
+
+      ctx.globalAlpha = 1;
     }
   }
 
