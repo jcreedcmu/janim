@@ -4,31 +4,34 @@ Seeing Upside-Down: a brief taste of algebraic geometry
 
 [clear]
 
-VO: Let's talk about rings.
+VO: Let's talk about real polynomial rings.
 
-VO: A ring is a set that knows how to add, subtract, and multiply.
-    Soem basic examples are: the integers, the integers modulo some n, the rationals, the real numbers, the complex numbers.
+[Show something like $\R[t] \qquad \R[x,y] \qquad \R[u,v,w] \qquad \cdots$ ]
 
-[Show each of these in sequence: \Z, \Z/\Z n, \Q, \R, \C]
+VO: The elements of one of these rings are all the polynomials we can write down over a particular set of variables,
+with real coeffients.
 
-VO: Here's another example: any ring with some *variables* adjoined to it is also a ring.
+[Show a bunch of example polynomials underneath each of these rings]
 
-[Show \R[x,y]]
+VO: What are the nice functions between these rings? Let's consider an example.
 
-VO: The elements of this ring are all the possible expressions we could write down
-nvolving the real numbers, and variables x and y,
+[Show $f : \R[x,y] \to \R[t]$ ]
 
-[Show a bunch of example real numbers 0, 1, -2, 100/3, 9.5, \pi, sqrt{2}, and variables x and y in a sort of chaotic soup]
+What are some nice functions from R[x,y] to R[t]? Let's say that we want to only map constants
+to themselves.
 
-VO: built up with ring operations --- addition, subtraction, and multiplication.
+[show f(0) = 0 and f(-3) = -3 and f(100/7) = 100/7]
 
-[Show some new expressions like 8, 3+5, 2 * \pi, \pi * 2, y + x * x * x, x^3 + y, x * y, y * x]
+If f is a ring homomorphism, then the only freedom we have left is deciding what x and y
+get mapped to. What happens to a polynomial in R[x,y] is completely determined by constants
+and x and y. In other words, a nice function from R[x,y] to R[t] amounts to making
+only two choices: choosing a polynomial in t to map x to, and another polynomial in t to map y to.
 
-We consider two expressions the same if the ring axioms force them to be the same.
-
-[animate unifying 8 with 3 + 5,
-2 * \pi with \pi * 2,
-y + x * x * x with  x^3 + y,
-x * y with y * x]
-
-VO: The elements of this ring are exactly the *polynomials* over x and y, with real number coefficients.
+[animate cycling through various examples of these... like hold on
+x \mapsto t^3 + 1
+y \mapsto t^2 - t
+and then transition to
+x \mapsto t
+y \mapsto t^5 - t^4 + t^3 - t^2 + 3
+etc.
+]

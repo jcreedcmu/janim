@@ -2,88 +2,87 @@ import { AnimationConfig, AnimationFn, TexRenderer, lerp, easeInOut, timeSlice }
 
 const TITLE = 'Seeing Upside-Down';
 const SUBTITLE = 'a brief taste of algebraic geometry';
-const TEX_Z = '\\mathbb{Z}';
-const TEX_ZN = '\\mathbb{Z}/n\\mathbb{Z}';
-const TEX_Q = '\\mathbb{Q}';
-const TEX_R = '\\mathbb{R}';
-const TEX_C = '\\mathbb{C}';
-const TEX_RXY = '\\mathbb{R}[x,y]';
-
-const RINGS = [TEX_Z, TEX_ZN, TEX_Q, TEX_R, TEX_C];
 const FADE = 0.15;
 const SHOW_CC = true;
 
-// --- "Soup" elements: raw ingredients of R[x,y] ---
-const SOUP_NUMS = ['0', '1', '-2', '\\tfrac{100}{3}', '9.5', '\\pi', '\\sqrt{2}'];
-const SOUP_VARS = ['x', 'y'];
-const SOUP_ALL = [...SOUP_NUMS, ...SOUP_VARS];
+// --- Colored variables ---
+const T = '{\\color{#3e8aff}{t}}';
+const X = '{\\color{#ff6b66}{x}}';
+const Y = '{\\color{#b28800}{y}}';
+const U = '{\\color{#6eb200}{u}}';
+const V = '{\\color{#b100d1}{v}}';
+const W = '{\\color{#00b2bb}{w}}';
 
-// --- Expressions built from ring operations ---
-const EXPR_PAIRS: [string, string][] = [
-  ['8', '3+5'],
-  ['2\\pi', '\\pi \\cdot 2'],
-  ['y + x \\cdot x \\cdot x', 'x^3 + y'],
-  ['x \\cdot y', 'y \\cdot x'],
+// --- Polynomial ring labels ---
+const TEX_RT = `\\mathbb{R}[${T}]`;
+const TEX_RXY = `\\mathbb{R}[${X},${Y}]`;
+const TEX_RUVW = `\\mathbb{R}[${U},${V},${W}]`;
+const TEX_CDOTS = '\\cdots';
+const RING_LABELS = [TEX_RT, TEX_RXY, TEX_RUVW, TEX_CDOTS];
+
+// --- Example polynomials under each ring ---
+const POLY_RT = [`${T}^2 + 1`, `3${T} - \\pi`, `${T}^5`];
+const POLY_RXY = [`${X}^2 + ${Y}`, `${X}${Y} - 3.2`, '17.9'];
+const POLY_RUVW = [`${U} + ${V}${W}`, `3${U} - ${V}`, `${U}${V}^9`];
+const POLY_GROUPS = [POLY_RT, POLY_RXY, POLY_RUVW];
+const ALL_POLYS = [...POLY_RT, ...POLY_RXY, ...POLY_RUVW];
+
+// --- Homomorphism ---
+const TEX_F_TYPE = `f : \\mathbb{R}[${X},${Y}] \\to \\mathbb{R}[${T}]`;
+const TEX_F0 = 'f(0) = 0';
+const TEX_F3 = 'f(-3) = -3';
+const TEX_F100 = 'f(\\tfrac{100}{7}) = \\tfrac{100}{7}';
+const CONST_EXPRS = [TEX_F0, TEX_F3, TEX_F100];
+
+// --- Mapping examples: persistent prefixes + cycling RHS ---
+const TEX_X_MAPSTO = `${X} \\mapsto`;
+const TEX_Y_MAPSTO = `${Y} \\mapsto`;
+
+const MAPPING_RHS: [string, string][] = [
+  [`${T}^3 + 1`, `${T}^2 - ${T}`],
+  [`${T}`, `${T}^5 - ${T}^4 + ${T}^3 - ${T}^2 + 3`],
+  [`2${T} - 1`, `${T}^2`],
+  [`0`, `${T}`],
 ];
-const EXPRS_LEFT = EXPR_PAIRS.map(p => p[0]);
-const EXPRS_RIGHT = EXPR_PAIRS.map(p => p[1]);
-const ALL_EXPRS = [...EXPRS_LEFT, ...EXPRS_RIGHT];
-
-// --- Pseudo-random but deterministic positions for soup ---
-function seededPositions(count: number, width: number, height: number, seed: number) {
-  const positions: { x: number; y: number }[] = [];
-  let s = seed;
-  function rand() { s = (s * 1664525 + 1013904223) & 0x7fffffff; return s / 0x7fffffff; }
-  const margin = 200;
-  for (let i = 0; i < count; i++) {
-    positions.push({
-      x: margin + rand() * (width - 2 * margin),
-      y: margin + rand() * (height - 2 * margin - 150),
-    });
-  }
-  return positions;
-}
+const ALL_RHS = MAPPING_RHS.flat();
 
 // --- Timeline ---
-// 0–4:     Title card
-// 4–12:    Ring examples (Z, Z/nZ, Q, R, C)
-// 12–16:   R[x,y] introduction
-// 16–18:   R[x,y] fade out
-// 18–24:   "Chaotic soup" of numbers and variables
-// 24–30:   Expressions built with ring operations
-// 30–36:   Unification animation (pairs merge)
-// 36–40:   "polynomials" conclusion
-
-const RING_APPEAR = [7.1, 8.3, 9.5, 10.7, 11.9];
+// 0–3:     Title card
+// 3–10:    Polynomial ring labels + example polys
+// 10–30:   Homomorphism f : R[x,y] → R[t]
+//   10–14:   Type signature appears
+//   14–19:   Constants map to themselves
+//   19–30:   Mapping examples cycle
 
 const CAPTIONS: [number, number, string][] = [
-  [4, 4.8, "Let's talk about rings."],
-  [4.8, 6, "A ring is a set that knows how to\nadd, subtract, and multiply."],
-  [6, 7.2, "Some basic examples are: the integers,"],
-  [7.2, 8.4, "the integers modulo some n,"],
-  [8.4, 9.6, "the rationals,"],
-  [9.6, 10.8, "the real numbers,"],
-  [10.8, 12, "the complex numbers."],
-  [12, 14, "Here's another example:"],
-  [14, 18, "any ring with some variables\nadjoined to it is also a ring."],
-  [18, 22, "The elements of this ring are all the\nexpressions we could write down"],
-  [22, 24, "involving real numbers,\nand variables x and y,"],
-  [24, 28, "built up with ring operations \u2014\naddition, subtraction, and multiplication."],
-  [28, 34, "We consider two expressions the same\nif the ring axioms force them to be."],
-  [34, 40, "The elements of this ring are exactly\nthe polynomials over x and y."],
+  [3, 5, "Let's talk about real polynomial rings."],
+  [5, 7.5, "The elements of one of these rings\nare all the polynomials we can write down"],
+  [7.5, 10, "over a particular set of variables,\nwith real coefficients."],
+  [10, 12.5, "What are the nice functions\nbetween these rings?"],
+  [12.5, 14, "Let's consider an example."],
+  [14, 16.5, "What are some nice functions\nfrom R[x,y] to R[t]?"],
+  [16.5, 19, "Let's say that we want to only\nmap constants to themselves."],
+  [19, 22, "If we demand that f is a ring homomorphism,\nthen the only freedom we have left"],
+  [22, 25, "is deciding what x and y\nget mapped to."],
+  [25, 28, "A nice function from R[x,y] to R[t]\namounts to making only two choices:"],
+  [28, 30, "choosing a polynomial in t for x,\nand another for y."],
 ];
 
 export const config: AnimationConfig = {
   width: 1920,
   height: 1080,
-  duration: 40,
+  duration: 30,
   fps: 30,
 };
 
 export const tex = new TexRenderer();
 
 export async function setup(): Promise<void> {
-  await tex.prepare([...RINGS, TEX_RXY, ...SOUP_ALL, ...ALL_EXPRS]);
+  await tex.prepare([
+    ...RING_LABELS, ...ALL_POLYS,
+    TEX_F_TYPE, ...CONST_EXPRS,
+    TEX_X_MAPSTO, TEX_Y_MAPSTO, ...ALL_RHS,
+  ]);
 }
 
 async function drawTexCentered(
@@ -126,10 +125,10 @@ export const animate: AnimationFn = async (ctx, t) => {
   ctx.fillStyle = '#faf5e7';
   ctx.fillRect(0, 0, width, height);
 
-  // --- Title card (0–4s) ---
-  if (t < 4) {
+  // --- Title card (0–3s) ---
+  if (t < 3) {
     const fadeIn = easeInOut(timeSlice(t, 0, FADE));
-    const fadeOut = 1 - easeInOut(timeSlice(t, 4 - FADE, 4));
+    const fadeOut = 1 - easeInOut(timeSlice(t, 3 - FADE, 3));
     const alpha = Math.min(fadeIn, fadeOut);
     if (alpha > 0) {
       ctx.globalAlpha = alpha;
@@ -144,159 +143,138 @@ export const animate: AnimationFn = async (ctx, t) => {
     }
   }
 
-  // --- Ring examples (4–12s) ---
-  if (t >= 4 && t < 12) {
-    const scale = 4;
-    const gap = 60;
+  // --- Ring labels + example polys (3–10s) ---
+  if (t >= 3 && t < 10.5) {
+    const phaseOut = 1 - easeInOut(timeSlice(t, 10, 10 + FADE));
+    const scale = 3.5;
+    const gap = 200;
 
-    const measures = RINGS.map(r => tex.measure(r));
+    // Layout ring labels in a row
+    const measures = RING_LABELS.map(r => tex.measure(r));
     const widths = measures.map(m => m.width * scale);
-    const totalW = widths.reduce((a, b) => a + b, 0) + gap * (RINGS.length - 1);
-    let x = (width - totalW) / 2;
-    const baselineY = height / 2;
+    const totalW = widths.reduce((a, b) => a + b, 0) + gap * (RING_LABELS.length - 1);
+    const labelY = height / 3;
 
-    for (let i = 0; i < RINGS.length; i++) {
-      const appearTime = RING_APPEAR[i];
-      const p = easeInOut(timeSlice(t, appearTime, appearTime + FADE));
-      if (p > 0) {
-        ctx.globalAlpha = p;
-        const y = baselineY - measures[i].baseline * scale;
-        await tex.draw(ctx, RINGS[i], x, y, scale);
-        ctx.globalAlpha = 1;
-      }
-      x += widths[i] + gap;
-    }
-  }
-
-  // --- R[x,y] introduction (12–18s) ---
-  if (t >= 12 && t < 18) {
-    // Fade out ring row
-    const ringFade = 1 - easeInOut(timeSlice(t, 12, 12 + FADE));
-    if (ringFade > 0) {
-      const scale = 4;
-      const gap = 60;
-      const measures = RINGS.map(r => tex.measure(r));
-      const widths = measures.map(m => m.width * scale);
-      const totalW = widths.reduce((a, b) => a + b, 0) + gap * (RINGS.length - 1);
-      let x = (width - totalW) / 2;
-      const baselineY = height / 2;
-
-      ctx.globalAlpha = ringFade;
-      for (let i = 0; i < RINGS.length; i++) {
-        const y = baselineY - measures[i].baseline * scale;
-        await tex.draw(ctx, RINGS[i], x, y, scale);
-        x += widths[i] + gap;
-      }
-      ctx.globalAlpha = 1;
+    // Center x positions for each label
+    const labelCenterX: number[] = [];
+    let xPos = (width - totalW) / 2;
+    for (let i = 0; i < RING_LABELS.length; i++) {
+      labelCenterX.push(xPos + widths[i] / 2);
+      xPos += widths[i] + gap;
     }
 
-    // R[x,y] fade in then hold, fade out at end
-    const rxyIn = easeInOut(timeSlice(t, 13, 13 + FADE));
-    const rxyOut = 1 - easeInOut(timeSlice(t, 18 - FADE, 18));
-    const rxyAlpha = Math.min(rxyIn, rxyOut);
-    if (rxyAlpha > 0) {
-      ctx.globalAlpha = rxyAlpha;
-      await drawTexCentered(ctx, TEX_RXY, width / 2, height / 2, 5);
-      ctx.globalAlpha = 1;
-    }
-  }
-
-  // --- Chaotic soup of numbers and variables (18–24s) ---
-  if (t >= 18 && t < 24) {
-    const soupPositions = seededPositions(SOUP_ALL.length, width, height, 42);
-    const scale = 3;
-
-    for (let i = 0; i < SOUP_ALL.length; i++) {
-      // Stagger appearance over 18–20s
-      const appearTime = 18 + (i / SOUP_ALL.length) * 2;
-      const fadeOut = 1 - easeInOut(timeSlice(t, 24 - FADE, 24));
-      const fadeIn = easeInOut(timeSlice(t, appearTime, appearTime + FADE));
-      const alpha = Math.min(fadeIn, fadeOut);
+    // Ring labels appear one by one (3.5–5s)
+    const LABEL_APPEAR = [3.5, 4.0, 4.5, 5.0];
+    for (let i = 0; i < RING_LABELS.length; i++) {
+      const fadeIn = easeInOut(timeSlice(t, LABEL_APPEAR[i], LABEL_APPEAR[i] + FADE));
+      const alpha = fadeIn * phaseOut;
       if (alpha > 0) {
         ctx.globalAlpha = alpha;
-        await drawTexCentered(ctx, SOUP_ALL[i], soupPositions[i].x, soupPositions[i].y, scale);
+        await drawTexCentered(ctx, RING_LABELS[i], labelCenterX[i], labelY, scale);
         ctx.globalAlpha = 1;
       }
     }
-  }
 
-  // --- Expressions with ring operations (24–36s) ---
-  if (t >= 24 && t < 36) {
-    const scale = 3;
-    const pairGap = 120;
-    const rowHeight = 100;
-    const startY = 200;
-
-    for (let i = 0; i < EXPR_PAIRS.length; i++) {
-      const [left, right] = EXPR_PAIRS[i];
-      const appearTime = 24 + i * 1;
-      const fadeIn = easeInOut(timeSlice(t, appearTime, appearTime + FADE));
-
-      // Unification: pairs merge toward center during 30–34s
-      const unifyStart = 30 + i * 1;
-      const unifyP = easeInOut(timeSlice(t, unifyStart, unifyStart + 1));
-
-      const leftMeasure = tex.measure(left);
-      const rightMeasure = tex.measure(right);
-      const cx = width / 2;
-      const cy = startY + i * (rowHeight + 40);
-
-      // Start: left and right separated by gap
-      // End: both converge to center, right fades out
-      const separation = lerp(pairGap, 0, unifyP);
-      const leftX = cx - separation / 2 - leftMeasure.width * scale / 2;
-      const rightX = cx + separation / 2 - rightMeasure.width * scale / 2;
-
-      if (fadeIn > 0) {
-        // "=" sign between them (fades in with pair, fades out during unify)
-        const eqAlpha = fadeIn * (1 - unifyP);
-        if (eqAlpha > 0) {
-          ctx.globalAlpha = eqAlpha;
-          ctx.fillStyle = '#000';
-          ctx.font = '48px Roboto, sans-serif';
-          ctx.textAlign = 'center';
-          ctx.textBaseline = 'middle';
-          ctx.fillText('=', cx, cy);
-          ctx.globalAlpha = 1;
-        }
-
-        // Left expression
-        ctx.globalAlpha = fadeIn;
-        await tex.draw(ctx, left, leftX, cy - leftMeasure.height * scale / 2, scale);
-        ctx.globalAlpha = 1;
-
-        // Right expression (fades out during unification)
-        const rightAlpha = fadeIn * (1 - unifyP);
-        if (rightAlpha > 0) {
-          ctx.globalAlpha = rightAlpha;
-          await tex.draw(ctx, right, rightX, cy - rightMeasure.height * scale / 2, scale);
+    // Example polys appear underneath (6–8s)
+    const polyScale = 2.5;
+    const polyStartTimes = [6.0, 6.5, 7.0];
+    for (let g = 0; g < POLY_GROUPS.length; g++) {
+      const polys = POLY_GROUPS[g];
+      const cx = labelCenterX[g];
+      for (let j = 0; j < polys.length; j++) {
+        const appearT = polyStartTimes[g] + j * 0.4;
+        const fadeIn = easeInOut(timeSlice(t, appearT, appearT + FADE));
+        const alpha = fadeIn * phaseOut;
+        if (alpha > 0) {
+          ctx.globalAlpha = alpha;
+          await drawTexCentered(ctx, polys[j], cx, labelY + 120 + j * 80, polyScale);
           ctx.globalAlpha = 1;
         }
       }
     }
   }
 
-  // --- "Polynomials" conclusion (36–40s) ---
-  if (t >= 36) {
-    // Fade out expressions
-    const exprFade = 1 - easeInOut(timeSlice(t, 36, 36 + FADE));
-    if (exprFade > 0) {
-      // Just let them vanish with the fade — the previous block
-      // won't draw since t >= 36.
-    }
-
-    // Show R[x,y] = "polynomials" centered
-    const fadeIn = easeInOut(timeSlice(t, 36.5, 36.5 + FADE));
-    if (fadeIn > 0) {
-      ctx.globalAlpha = fadeIn;
-      await drawTexCentered(ctx, TEX_RXY, width / 2, height / 2, 5);
-
-      ctx.fillStyle = '#000';
-      ctx.font = '48px Roboto, sans-serif';
-      ctx.textAlign = 'center';
-      ctx.textBaseline = 'top';
-      ctx.fillText('= polynomials in x and y with real coefficients', width / 2, height / 2 + 60);
+  // --- Homomorphism: f : R[x,y] → R[t] (10–30s) ---
+  if (t >= 10) {
+    // Type signature: fades in at 10.5, persists, fades out at end
+    const fTypeIn = easeInOut(timeSlice(t, 10.5, 10.5 + FADE));
+    const fTypeOut = 1 - easeInOut(timeSlice(t, 30 - FADE, 30));
+    const fAlpha = Math.min(fTypeIn, fTypeOut);
+    if (fAlpha > 0) {
+      ctx.globalAlpha = fAlpha;
+      await drawTexCentered(ctx, TEX_F_TYPE, width / 2, height / 4, 4);
       ctx.globalAlpha = 1;
+    }
+
+    // Constants: f(0)=0, f(-3)=-3, f(100/7)=100/7 (17–19.5s)
+    if (t >= 17 && t < 19.5) {
+      const constOut = 1 - easeInOut(timeSlice(t, 19, 19 + FADE));
+      const constTimes = [17.2, 17.6, 18.0];
+      for (let i = 0; i < CONST_EXPRS.length; i++) {
+        const fadeIn = easeInOut(timeSlice(t, constTimes[i], constTimes[i] + FADE));
+        const alpha = fadeIn * constOut;
+        if (alpha > 0) {
+          ctx.globalAlpha = alpha;
+          await drawTexCentered(ctx, CONST_EXPRS[i], width / 2, height / 2 + i * 90, 3);
+          ctx.globalAlpha = 1;
+        }
+      }
+    }
+
+    // Mapping examples cycle (19.5–30s)
+    if (t >= 19.5) {
+      const exampleDur = 2.5;
+      const crossFade = 0.3;
+      const mapScale = 3.5;
+      const rhsGap = 20;
+
+      // Layout: center the block (prefix + gap + widest RHS)
+      const xPrefixM = tex.measure(TEX_X_MAPSTO);
+      const yPrefixM = tex.measure(TEX_Y_MAPSTO);
+      const prefixW = Math.max(xPrefixM.width, yPrefixM.width) * mapScale;
+      const maxRhsW = Math.max(...ALL_RHS.map(e => tex.measure(e).width * mapScale));
+      const totalW = prefixW + rhsGap + maxRhsW;
+      const leftX = (width - totalW) / 2;
+      const rhsX = leftX + prefixW + rhsGap;
+
+      // Two baseline Y positions for the x and y rows
+      const xBaselineY = height / 2;
+      const yBaselineY = height / 2 + 100;
+
+      // Persistent prefixes: x ↦ and y ↦ (baseline-aligned)
+      const prefixIn = easeInOut(timeSlice(t, 19.5, 19.5 + crossFade));
+      const prefixOut = 1 - easeInOut(timeSlice(t, 30 - FADE, 30));
+      const prefixAlpha = Math.min(prefixIn, prefixOut);
+      if (prefixAlpha > 0) {
+        ctx.globalAlpha = prefixAlpha;
+        await tex.draw(ctx, TEX_X_MAPSTO, leftX, xBaselineY - xPrefixM.baseline * mapScale, mapScale);
+        await tex.draw(ctx, TEX_Y_MAPSTO, leftX, yBaselineY - yPrefixM.baseline * mapScale, mapScale);
+        ctx.globalAlpha = 1;
+      }
+
+      // Cycling RHS values (baseline-aligned to same rows)
+      for (let i = 0; i < MAPPING_RHS.length; i++) {
+        const [xRhs, yRhs] = MAPPING_RHS[i];
+        const start = 19.5 + i * exampleDur;
+        const end = start + exampleDur;
+
+        if (t < start || t > end + crossFade) continue;
+
+        const fadeIn = easeInOut(timeSlice(t, start, start + crossFade));
+        const fadeOut = (i < MAPPING_RHS.length - 1)
+          ? 1 - easeInOut(timeSlice(t, end - crossFade, end))
+          : 1 - easeInOut(timeSlice(t, 30 - FADE, 30));
+        const alpha = Math.min(fadeIn, fadeOut);
+
+        if (alpha > 0) {
+          ctx.globalAlpha = alpha;
+          const xM = tex.measure(xRhs);
+          const yM = tex.measure(yRhs);
+          await tex.draw(ctx, xRhs, rhsX, xBaselineY - xM.baseline * mapScale, mapScale);
+          await tex.draw(ctx, yRhs, rhsX, yBaselineY - yM.baseline * mapScale, mapScale);
+          ctx.globalAlpha = 1;
+        }
+      }
     }
   }
 

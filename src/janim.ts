@@ -41,10 +41,13 @@ function parseDimension(value: string): number {
 interface TexCacheEntry {
   // Raw SVG template with %WIDTH% and %HEIGHT% placeholders for dimensions
   svgTemplate: string;
-  width: number;
-  height: number;
-  // Distance from top of bounding box to baseline, in logical px
-  baseline: number;
+  width: number;       // logical content width in px
+  height: number;      // logical content height in px
+  baseline: number;    // distance from top of content to baseline, in logical px
+  padX: number;        // left padding offset in logical px
+  padY: number;        // top padding offset in logical px
+  drawWidth: number;   // total image width including padding
+  drawHeight: number;  // total image height including padding
   // Browser: pre-loaded Image (browser re-rasterizes SVG at draw size)
   browserImage?: ImageLike;
   // Node: loadImage function, cached at import time
@@ -63,7 +66,7 @@ export class TexRenderer {
     this.html = mathjax.document('', { InputJax: tex, OutputJax: svg });
   }
 
-  private texToSvg(expression: string): { svgTemplate: string; width: number; height: number; baseline: number } {
+  private texToSvg(expression: string) {
     const node = this.html.convert(expression, { display: true });
     // innerHTML strips the <mjx-container> wrapper, giving us just the <svg>
     let svgString = this.adaptor.innerHTML(node);
@@ -81,6 +84,10 @@ export class TexRenderer {
     // so baseline is at (-minY / vbH) * height in logical pixels.
     const vbMatch = svgString.match(/viewBox="([^"]+)"/);
     let baseline = height * 0.8; // fallback
+    let padX = 0;
+    let padY = 0;
+    let drawWidth = width;
+    let drawHeight = height;
     if (vbMatch) {
       const [minX, minY, vbW, vbH] = vbMatch[1].split(' ').map(Number);
       baseline = (-minY / vbH) * height;
@@ -89,6 +96,12 @@ export class TexRenderer {
       const VIEWBOX_PAD = 50;
       const padded = `${minX - VIEWBOX_PAD} ${minY - VIEWBOX_PAD} ${vbW + 2 * VIEWBOX_PAD} ${vbH + 2 * VIEWBOX_PAD}`;
       svgString = svgString.replace(`viewBox="${vbMatch[1]}"`, `viewBox="${padded}"`);
+
+      // Track padding in logical pixels so draw() can compensate
+      padX = width * VIEWBOX_PAD / vbW;
+      padY = height * VIEWBOX_PAD / vbH;
+      drawWidth = width + 2 * padX;
+      drawHeight = height + 2 * padY;
     }
 
     // Replace dimensions with placeholders so we can stamp in the exact
@@ -96,7 +109,7 @@ export class TexRenderer {
     if (widthMatch) svgString = svgString.replace(`width="${widthMatch[1]}"`, `width="%WIDTH%"`);
     if (heightMatch) svgString = svgString.replace(`height="${heightMatch[1]}"`, `height="%HEIGHT%"`);
 
-    return { svgTemplate: svgString, width, height, baseline };
+    return { svgTemplate: svgString, width, height, baseline, padX, padY, drawWidth, drawHeight };
   }
 
   async prepare(expressions: string[]): Promise<void> {
@@ -105,19 +118,19 @@ export class TexRenderer {
     for (const expr of expressions) {
       if (this.cache.has(expr)) continue;
 
-      const { svgTemplate, width, height, baseline } = this.texToSvg(expr);
-      const entry: TexCacheEntry = { svgTemplate, width, height, baseline };
+      const { svgTemplate, width, height, baseline, padX, padY, drawWidth, drawHeight } = this.texToSvg(expr);
+      const entry: TexCacheEntry = { svgTemplate, width, height, baseline, padX, padY, drawWidth, drawHeight };
 
       if (isNode) {
         const { loadImage } = await import('@napi-rs/canvas');
         entry.nodeLoadImage = loadImage as any;
       } else {
-        // Browser: load an image with the logical dimensions.
+        // Browser: load an image with the padded dimensions.
         // The browser re-rasterizes SVG at whatever size drawImage requests,
         // so we don't need per-frame loading.
         const svgString = svgTemplate
-          .replace('%WIDTH%', `${width}px`)
-          .replace('%HEIGHT%', `${height}px`);
+          .replace('%WIDTH%', `${drawWidth}px`)
+          .replace('%HEIGHT%', `${drawHeight}px`);
         const img = new Image();
         const dataUrl = 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(svgString);
         await new Promise<void>((resolve, reject) => {
@@ -142,21 +155,23 @@ export class TexRenderer {
     const entry = this.cache.get(tex);
     if (!entry) throw new Error(`TeX not prepared: "${tex}". Call prepare() first.`);
 
-    const w = entry.width * scale;
-    const h = entry.height * scale;
+    // Render at padded dimensions but offset so content aligns at (x, y)
+    const dw = entry.drawWidth * scale;
+    const dh = entry.drawHeight * scale;
+    const ox = entry.padX * scale;
+    const oy = entry.padY * scale;
 
     if (entry.browserImage) {
-      // Browser: drawImage with target size — browser re-rasterizes the SVG
-      ctx.drawImage(entry.browserImage as any, x, y, w, h);
+      ctx.drawImage(entry.browserImage as any, x - ox, y - oy, dw, dh);
     } else if (entry.nodeLoadImage) {
       // Node: rasterize SVG at SVG_SUPERSAMPLE × target size, then drawImage
       // downsamples to the target size for sharper edges.
       const svgString = entry.svgTemplate
-        .replace('%WIDTH%', `${w * SVG_SUPERSAMPLE}px`)
-        .replace('%HEIGHT%', `${h * SVG_SUPERSAMPLE}px`);
+        .replace('%WIDTH%', `${dw * SVG_SUPERSAMPLE}px`)
+        .replace('%HEIGHT%', `${dh * SVG_SUPERSAMPLE}px`);
       const buf = Buffer.from(svgString, 'utf-8');
       const img = await entry.nodeLoadImage(buf);
-      ctx.drawImage(img as any, x, y, w, h);
+      ctx.drawImage(img as any, x - ox, y - oy, dw, dh);
     }
   }
 
