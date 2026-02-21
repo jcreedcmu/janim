@@ -27,6 +27,10 @@ type ImageLike = HTMLImageElement | { width: number; height: number };
 // 1 ex ≈ 8px at default MathJax font size — tunable
 const EX_TO_PX = 8;
 
+// Supersample factor: rasterize SVGs at this multiple of target size, then
+// downsample via drawImage. Higher = sharper edges but slower. 1 = no supersampling.
+const SVG_SUPERSAMPLE = 1.5;
+
 function parseDimension(value: string): number {
   const n = parseFloat(value);
   if (value.endsWith('ex')) return n * EX_TO_PX;
@@ -138,13 +142,14 @@ export class TexRenderer {
       // Browser: drawImage with target size — browser re-rasterizes the SVG
       ctx.drawImage(entry.browserImage as any, x, y, w, h);
     } else if (entry.nodeLoadImage) {
-      // Node: rasterize SVG at exact target pixel size, then draw 1:1
+      // Node: rasterize SVG at SVG_SUPERSAMPLE × target size, then drawImage
+      // downsamples to the target size for sharper edges.
       const svgString = entry.svgTemplate
-        .replace('%WIDTH%', `${w}px`)
-        .replace('%HEIGHT%', `${h}px`);
+        .replace('%WIDTH%', `${w * SVG_SUPERSAMPLE}px`)
+        .replace('%HEIGHT%', `${h * SVG_SUPERSAMPLE}px`);
       const buf = Buffer.from(svgString, 'utf-8');
       const img = await entry.nodeLoadImage(buf);
-      ctx.drawImage(img as any, x, y);
+      ctx.drawImage(img as any, x, y, w, h);
     }
   }
 
