@@ -1,6 +1,6 @@
 import { AnimationConfig, AnimationFn, TexRenderer, easeInOut, timeSlice } from './janim.js';
 import { CurveDef, computeFixedViewport, Viewport, CurveDef3D, createProjection, computeFixedViewport3D } from './plot.js';
-import { SceneDraw, titleScene, ringsScene, homomorphismScene, parametricScene, parametric3DScene } from './scenes.js';
+import { SceneDraw, titleScene, ringsScene, homomorphismScene, parametricScene, parametric3DScene, dualityScene } from './scenes.js';
 
 export const TITLE = 'Seeing Upside-Down';
 export const SUBTITLE = 'a brief taste of algebraic geometry';
@@ -83,6 +83,14 @@ export const PROJ_ELEVATION = 1.1;
 export const PROJ_DISTANCE = 10;
 export const PROJ_ROTATION_SPEED = 0.15; // radians per second
 
+// --- Duality / conclusion ---
+const DUALITY_2D = `\\mathbb{R}[${X},${Y}] \\to \\mathbb{R}[${T}] \\quad\\longleftrightarrow\\quad \\text{curves in } \\mathbb{R}^2`;
+const DUALITY_3D = `\\mathbb{R}[${X},${Y},${Z}] \\to \\mathbb{R}[${T}] \\quad\\longleftrightarrow\\quad \\text{curves in } \\mathbb{R}^3`;
+const DUALITY_GENERAL = `\\mathbb{R}[${X}_1,\\ldots,${X}_n] \\to \\mathbb{R}[${T}_1,\\ldots,${T}_p] \\quad\\longleftrightarrow\\quad \\mathbb{R}^p \\to \\mathbb{R}^n`;
+const DUALITY_CLOSING_EXPR = `\\text{algebra} \\quad\\longleftrightarrow\\quad \\text{geometry}`;
+export const DUALITY_ROWS = [DUALITY_2D, DUALITY_3D, DUALITY_GENERAL];
+export const DUALITY_CLOSING = DUALITY_CLOSING_EXPR;
+
 export const VIEWPORT_3D: Viewport = computeFixedViewport3D(
   CURVES_3D, createProjection(PROJ_AZIMUTH, PROJ_ELEVATION, PROJ_DISTANCE),
 );
@@ -90,7 +98,7 @@ export const VIEWPORT_3D: Viewport = computeFixedViewport3D(
 export const config: AnimationConfig = {
   width: 1920,
   height: 1080,
-  duration: 50,
+  duration: 70,
   fps: 30,
 };
 
@@ -102,6 +110,7 @@ export async function setup(): Promise<void> {
     TEX_F_TYPE, ...CONST_EXPRS,
     TEX_X_MAPSTO, TEX_Y_MAPSTO, ...ALL_RHS, X, Y,
     TEX_Z_MAPSTO, Z, ...ALL_RHS_3D,
+    ...DUALITY_ROWS, DUALITY_CLOSING,
   ]);
 }
 
@@ -157,6 +166,20 @@ const TIMELINE: SceneEntry[] = [
     captions: [
       { start: 0, end: 4, text: "If we had asked about nice functions\nfrom R[x,y,z] to R[t]," },
       { start: 4, end: 8, text: "we would have found that they\nare parameterized curves in 3D space." },
+    ],
+  },
+  {
+    start: 50,
+    draw: dualityScene(),
+    captions: [
+      { start: 0, end: 5, text: "So maps from R[x,y] to R[t] tell us\nhow to map a one-dimensional line into the two-dimensional plane," },
+      { start: 5, end: 8, text: "and maps from R[x,y,z] to R[t]\ntell us how to map a line into 3D space." },
+      { start: 8, end: 11, text: "We're tempted to conclude that a polynomial ring\nwith n variables has something to do with n-dimensional space," },
+      { start: 11, end: 13, text: "but the functions seem\nturned around backwards." },
+      { start: 13, end: 15, text: "This pattern does work out nicely in general." },
+      { start: 15, end: 17.5, text: "Algebraically nice maps from a ring with n variables\nto a ring with p variables correspond to" },
+      { start: 17.5, end: 19, text: "geometrically nice maps going the other direction,\nfrom p-dimensional space to n-dimensional space." },
+      { start: 19, end: 20, text: "This is a small tip of a deep iceberg:\nthe duality between algebra and geometry." },
     ],
   },
 ];

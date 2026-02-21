@@ -9,6 +9,7 @@ import {
   TEX_Z_MAPSTO, MAPPING_RHS_3D, Z,
   CURVES_3D, VIEWPORT_3D,
   PROJ_AZIMUTH, PROJ_ELEVATION, PROJ_DISTANCE, PROJ_ROTATION_SPEED,
+  DUALITY_ROWS, DUALITY_CLOSING,
 } from './example.js';
 
 export type SceneDraw = (
@@ -345,6 +346,41 @@ export function parametric3DScene(cues: { plotStart: number }): SceneDraw {
       }
 
       ctx.globalAlpha = 1;
+    }
+  };
+}
+
+export function dualityScene(): SceneDraw {
+  return async (ctx, localT, { width, height, duration }) => {
+    const sectionOut = 1 - easeInOut(timeSlice(localT, duration - FADE, duration));
+    const rowScale = 2.8;
+    const rowGap = 100;
+    const rowAppear = [0, 5, 13]; // when each table row fades in
+    const tableFadeOut = 17; // when the whole table fades out
+
+    // Progressive table of correspondences
+    const tableOut = 1 - easeInOut(timeSlice(localT, tableFadeOut - 0.3, tableFadeOut));
+    for (let i = 0; i < DUALITY_ROWS.length; i++) {
+      if (localT < rowAppear[i]) continue;
+      const fadeIn = easeInOut(timeSlice(localT, rowAppear[i], rowAppear[i] + 0.3));
+      const alpha = Math.min(fadeIn, tableOut);
+      if (alpha <= 0) continue;
+
+      ctx.globalAlpha = alpha;
+      const cy = height / 2 + (i - 1) * rowGap;
+      await drawTexCentered(ctx, DUALITY_ROWS[i], width / 2, cy, rowScale);
+      ctx.globalAlpha = 1;
+    }
+
+    // Closing beat: "algebra ↔ geometry"
+    if (localT >= tableFadeOut - 0.3) {
+      const fadeIn = easeInOut(timeSlice(localT, tableFadeOut, tableFadeOut + 0.3));
+      const alpha = Math.min(fadeIn, sectionOut);
+      if (alpha > 0) {
+        ctx.globalAlpha = alpha;
+        await drawTexCentered(ctx, DUALITY_CLOSING, width / 2, height / 2, 4.5);
+        ctx.globalAlpha = 1;
+      }
     }
   };
 }
