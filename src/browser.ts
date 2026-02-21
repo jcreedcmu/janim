@@ -130,7 +130,8 @@ function drawWaveform(peaks: Peaks, cvs: HTMLCanvasElement, currentT: number, du
   // Draw one bar per pixel column, sampling from the fixed-size peaks array
   for (let px = 0; px < w; px++) {
     const t = xToTime(px, w);
-    const idx = Math.min(Math.max(0, Math.round((t / duration) * buckets)), buckets - 1);
+    const idx = Math.round((t / duration) * buckets);
+    if (idx < 0 || idx >= buckets) continue;
     const minVal = Math.max(-1, peaks.min[idx] * 3);
     const maxVal = Math.min(1, peaks.max[idx] * 3);
     // Map [-1,1] within the waveform region
@@ -254,8 +255,16 @@ async function init() {
   requestAnimationFrame(updateUI);
 
   // Play/Pause
-  playPauseBtn.addEventListener('click', () => {
+  function togglePlayPause() {
     if (ctrl.isPlaying()) syncPause(); else syncPlay();
+  }
+  playPauseBtn.addEventListener('click', togglePlayPause);
+  canvas.addEventListener('click', togglePlayPause);
+  window.addEventListener('keydown', (e) => {
+    if (e.code === 'Space') {
+      e.preventDefault();
+      togglePlayPause();
+    }
   });
 
   // Restart
@@ -334,14 +343,8 @@ async function init() {
       const dx = e.clientX - panLastX;
       const dtPerPx = (viewEnd - viewStart) / rect.width;
       const dt = -dx * dtPerPx;
-      const span = viewEnd - viewStart;
-      let newStart = viewStart + dt;
-      let newEnd = viewEnd + dt;
-      // Clamp to [0, duration]
-      if (newStart < 0) { newStart = 0; newEnd = span; }
-      if (newEnd > ctrl.duration) { newEnd = ctrl.duration; newStart = newEnd - span; }
-      viewStart = newStart;
-      viewEnd = newEnd;
+      viewStart += dt;
+      viewEnd += dt;
       panLastX = e.clientX;
     }
   });
@@ -359,17 +362,11 @@ async function init() {
     const mouseX = e.clientX - rect.left;
     const mouseT = xToTime(mouseX * dpr, waveformCanvas.width);
     const factor = e.deltaY > 0 ? 1.2 : 1 / 1.2;
-    const newSpan = Math.min(Math.max((viewEnd - viewStart) * factor, 0.5), ctrl.duration);
+    const newSpan = Math.max((viewEnd - viewStart) * factor, 0.5);
     // Keep mouseT at the same pixel position
     const frac = mouseX / rect.width;
-    let newStart = mouseT - frac * newSpan;
-    let newEnd = mouseT + (1 - frac) * newSpan;
-    // Clamp
-    if (newStart < 0) { newEnd -= newStart; newStart = 0; }
-    if (newEnd > ctrl.duration) { newStart -= (newEnd - ctrl.duration); newEnd = ctrl.duration; }
-    newStart = Math.max(0, newStart);
-    viewStart = newStart;
-    viewEnd = newEnd;
+    viewStart = mouseT - frac * newSpan;
+    viewEnd = mouseT + (1 - frac) * newSpan;
   }, { passive: false });
 }
 
