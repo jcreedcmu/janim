@@ -12,25 +12,26 @@ const audio = document.getElementById('audio') as HTMLAudioElement;
 let ctrl: AnimationController;
 
 // --- Waveform data ---
+const WAVEFORM_BUCKETS = 3000;
 type Peaks = { min: Float32Array; max: Float32Array };
 let peaks: Peaks | null = null;
 
-function computePeaks(channelData: Float32Array, sampleRate: number, duration: number, columns: number): Peaks {
+function computePeaks(channelData: Float32Array, sampleRate: number, duration: number): Peaks {
   const totalSamples = Math.min(channelData.length, Math.floor(sampleRate * duration));
-  const samplesPerCol = totalSamples / columns;
-  const minArr = new Float32Array(columns);
-  const maxArr = new Float32Array(columns);
-  for (let col = 0; col < columns; col++) {
-    const start = Math.floor(col * samplesPerCol);
-    const end = Math.min(Math.floor((col + 1) * samplesPerCol), totalSamples);
+  const samplesPerBucket = totalSamples / WAVEFORM_BUCKETS;
+  const minArr = new Float32Array(WAVEFORM_BUCKETS);
+  const maxArr = new Float32Array(WAVEFORM_BUCKETS);
+  for (let i = 0; i < WAVEFORM_BUCKETS; i++) {
+    const start = Math.floor(i * samplesPerBucket);
+    const end = Math.min(Math.floor((i + 1) * samplesPerBucket), totalSamples);
     let lo = 1, hi = -1;
-    for (let i = start; i < end; i++) {
-      const s = channelData[i];
+    for (let j = start; j < end; j++) {
+      const s = channelData[j];
       if (s < lo) lo = s;
       if (s > hi) hi = s;
     }
-    minArr[col] = lo;
-    maxArr[col] = hi;
+    minArr[i] = lo;
+    maxArr[i] = hi;
   }
   return { min: minArr, max: maxArr };
 }
@@ -42,19 +43,18 @@ function drawWaveform(peaks: Peaks, cvs: HTMLCanvasElement, currentT: number, du
   ctx.clearRect(0, 0, w, h);
 
   const playheadX = (currentT / duration) * w;
-  const cols = peaks.min.length;
-  const colW = w / cols;
+  const buckets = peaks.min.length;
 
-  // Draw waveform bars
-  for (let i = 0; i < cols; i++) {
-    const x = i * colW;
-    const minVal = Math.max(-1, peaks.min[i] * 3);
-    const maxVal = Math.min(1, peaks.max[i] * 3);
+  // Draw one bar per pixel column, sampling from the fixed-size peaks array
+  for (let px = 0; px < w; px++) {
+    const idx = Math.min(Math.round((px / w) * buckets), buckets - 1);
+    const minVal = Math.max(-1, peaks.min[idx] * 3);
+    const maxVal = Math.min(1, peaks.max[idx] * 3);
     // Map [-1,1] to [h, 0]
     const yMin = ((1 - maxVal) / 2) * h;
     const yMax = ((1 - minVal) / 2) * h;
-    ctx.fillStyle = x < playheadX ? '#e94560' : '#555';
-    ctx.fillRect(x, yMin, Math.max(colW - 0.5, 1), yMax - yMin);
+    ctx.fillStyle = px < playheadX ? '#e94560' : '#555';
+    ctx.fillRect(px, yMin, 1, yMax - yMin);
   }
 
   // Scene boundary lines
@@ -116,20 +116,14 @@ async function init() {
     const audioCtx = new AudioContext();
     const decoded = await audioCtx.decodeAudioData(buf);
     const channelData = decoded.getChannelData(0);
-    peaks = computePeaks(channelData, decoded.sampleRate, config.duration, waveformCanvas.width);
+    peaks = computePeaks(channelData, decoded.sampleRate, config.duration);
     audioCtx.close();
   } catch (err) {
     console.warn('Could not load audio for waveform:', err);
   }
 
-  // Resize handler
   window.addEventListener('resize', () => {
     sizeWaveformCanvas();
-    if (peaks) {
-      // Recompute peaks is not strictly necessary for resize since we stored
-      // channelData above, but peaks count is tied to canvas width. For simplicity,
-      // we just keep the existing peaks and stretch — good enough for now.
-    }
   });
 
   // UI update loop
