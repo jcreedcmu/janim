@@ -11,6 +11,23 @@ const TEX_RXY = '\\mathbb{R}[x,y]';
 
 const RINGS = [TEX_Z, TEX_ZN, TEX_Q, TEX_R, TEX_C];
 const FADE = 0.15; // seconds — very brief fades
+const SHOW_CC = true;
+
+// Ring symbol appear times — each symbol pops in at the end of its caption.
+const RING_APPEAR = [7.1, 8.3, 9.5, 10.7, 11.9];
+
+// Closed captions: [startTime, endTime, text]
+const CAPTIONS: [number, number, string][] = [
+  [4, 4.8, "Let's talk about rings."],
+  [4.8, 6, "A ring is a set that knows how to\nadd, subtract, and multiply."],
+  [6, 7.2, "Some basic examples are: the integers,"],
+  [7.2, 8.4, "the integers modulo some n,"],
+  [8.4, 9.6, "the rationals,"],
+  [9.6, 10.8, "the real numbers,"],
+  [10.8, 12, "the complex numbers."],
+  [12, 14, "But here's another example\nthat we're going to take a closer look at:"],
+  [14, 18, "any ring with some variables\nadjoined to it is also a ring."],
+];
 
 export const config: AnimationConfig = {
   width: 1920,
@@ -33,6 +50,33 @@ async function drawTexCentered(
   const w = size.width * scale;
   const h = size.height * scale;
   await tex.draw(ctx, expr, cx - w / 2, cy - h / 2, scale);
+}
+
+function drawCC(ctx: CanvasRenderingContext2D, t: number, width: number, height: number) {
+  if (!SHOW_CC) return;
+  const caption = CAPTIONS.find(([start, end]) => t >= start && t < end);
+  if (!caption) return;
+  const text = caption[2];
+  const lines = text.split('\n');
+
+  ctx.font = '36px Roboto, sans-serif';
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'bottom';
+
+  const lineHeight = 44;
+  const padding = 12;
+  const boxHeight = lines.length * lineHeight + padding * 2;
+  const boxY = height - 80 - boxHeight;
+
+  // Semi-transparent background
+  ctx.fillStyle = 'rgba(0, 0, 0, 0.7)';
+  ctx.fillRect(width / 2 - 600, boxY, 1200, boxHeight);
+
+  // Text
+  ctx.fillStyle = '#fff';
+  for (let i = 0; i < lines.length; i++) {
+    ctx.fillText(lines[i], width / 2, boxY + padding + (i + 1) * lineHeight);
+  }
 }
 
 export const animate: AnimationFn = async (ctx, t) => {
@@ -58,11 +102,10 @@ export const animate: AnimationFn = async (ctx, t) => {
       ctx.fillText(SUBTITLE, width / 2, height / 2 + 40);
       ctx.globalAlpha = 1;
     }
-    return;
   }
 
   // --- Ring examples (4–12s) ---
-  if (t < 12) {
+  if (t >= 4 && t < 12) {
     const scale = 4;
     const gap = 60;
 
@@ -70,10 +113,10 @@ export const animate: AnimationFn = async (ctx, t) => {
     const widths = measures.map(m => m.width * scale);
     const totalW = widths.reduce((a, b) => a + b, 0) + gap * (RINGS.length - 1);
     let x = (width - totalW) / 2;
-    const baselineY = height / 2; // common baseline
+    const baselineY = height / 2;
 
     for (let i = 0; i < RINGS.length; i++) {
-      const appearTime = 5 + i * 1.2;
+      const appearTime = RING_APPEAR[i];
       const p = easeInOut(timeSlice(t, appearTime, appearTime + FADE));
       if (p > 0) {
         ctx.globalAlpha = p;
@@ -83,12 +126,10 @@ export const animate: AnimationFn = async (ctx, t) => {
       }
       x += widths[i] + gap;
     }
-
-    return;
   }
 
   // --- R[x,y] (12–18s) ---
-  {
+  if (t >= 12) {
     const ringFade = 1 - easeInOut(timeSlice(t, 12, 12 + FADE));
     if (ringFade > 0) {
       const scale = 4;
@@ -115,4 +156,7 @@ export const animate: AnimationFn = async (ctx, t) => {
       ctx.globalAlpha = 1;
     }
   }
+
+  // --- Closed captions (drawn last, on top) ---
+  drawCC(ctx, t, width, height);
 };
