@@ -1,6 +1,6 @@
 import { AnimationConfig, AnimationFn, TexRenderer, easeInOut, timeSlice } from './janim.js';
-import { CurveDef, computeFixedViewport, Viewport } from './plot.js';
-import { SceneDraw, titleScene, ringsScene, homomorphismScene, parametricScene } from './scenes.js';
+import { CurveDef, computeFixedViewport, Viewport, CurveDef3D, createProjection, computeFixedViewport3D } from './plot.js';
+import { SceneDraw, titleScene, ringsScene, homomorphismScene, parametricScene, parametric3DScene } from './scenes.js';
 
 export const TITLE = 'Seeing Upside-Down';
 export const SUBTITLE = 'a brief taste of algebraic geometry';
@@ -58,10 +58,32 @@ export const CURVES: CurveDef[] = [
 
 export const VIEWPORT: Viewport = computeFixedViewport(CURVES);
 
+// --- 3D mapping data ---
+export const Z = '{\\color{#6eb200}{z}}';
+export const TEX_Z_MAPSTO = `${Z} \\mapsto`;
+
+export const MAPPING_RHS_3D: [string, string, string][] = [
+  [T, `${T}^2`, `${T}^3`],
+  [`${T}^3 + 1`, `${T}^2 - ${T}`, `2${T}`],
+  [`${T}^2 - 1`, T, `${T}^3 - ${T}`],
+  [`0`, T, `${T}^2`],
+];
+export const ALL_RHS_3D = MAPPING_RHS_3D.flat();
+
+export const CURVES_3D: CurveDef3D[] = [
+  { xFn: t => t, yFn: t => t ** 2, zFn: t => t ** 3, tRange: [-1.2, 1.2] },
+  { xFn: t => t ** 3 + 1, yFn: t => t ** 2 - t, zFn: t => 2 * t, tRange: [-1.5, 1.5] },
+  { xFn: t => t ** 2 - 1, yFn: t => t, zFn: t => t ** 3 - t, tRange: [-1.3, 1.3] },
+  { xFn: t => 0, yFn: t => t, zFn: t => t ** 2, tRange: [-1.5, 1.5] },
+];
+
+export const PROJECTION_3D = createProjection(0.3, 1.1, 10);
+export const VIEWPORT_3D: Viewport = computeFixedViewport3D(CURVES_3D, PROJECTION_3D);
+
 export const config: AnimationConfig = {
   width: 1920,
   height: 1080,
-  duration: 40,
+  duration: 50,
   fps: 30,
 };
 
@@ -72,6 +94,7 @@ export async function setup(): Promise<void> {
     ...RING_LABELS, ...ALL_POLYS,
     TEX_F_TYPE, ...CONST_EXPRS,
     TEX_X_MAPSTO, TEX_Y_MAPSTO, ...ALL_RHS, X, Y,
+    TEX_Z_MAPSTO, Z, ...ALL_RHS_3D,
   ]);
 }
 
@@ -119,6 +142,14 @@ const TIMELINE: SceneEntry[] = [
     captions: [
       { start: 0, end: 3.5, text: "This is the same thing as\ndescribing a parameterized curve in the plane." },
       { start: 3.5, end: 7, text: "We're giving for each time t a function\nthat tells us what the x and y values should be." },
+    ],
+  },
+  {
+    start: 40,
+    draw: parametric3DScene({ plotStart: 0.5 }),
+    captions: [
+      { start: 0, end: 4, text: "If we had asked about nice functions\nfrom R[x,y,z] to R[t]," },
+      { start: 4, end: 8, text: "we would have found that they\nare parameterized curves in 3D space." },
     ],
   },
 ];

@@ -1,11 +1,13 @@
 import { easeInOut, timeSlice } from './janim.js';
-import { PlotRect, drawPlotAxes, drawParametricCurve } from './plot.js';
+import { PlotRect, drawPlotAxes, drawParametricCurve, draw3DAxes, draw3DParametricCurve } from './plot.js';
 import {
   tex, FADE, TITLE, SUBTITLE,
   RING_LABELS, POLY_GROUPS,
   TEX_F_TYPE, CONST_EXPRS,
   TEX_X_MAPSTO, TEX_Y_MAPSTO, MAPPING_RHS, ALL_RHS,
   CURVES, VIEWPORT, X, Y,
+  TEX_Z_MAPSTO, MAPPING_RHS_3D, Z,
+  CURVES_3D, VIEWPORT_3D, PROJECTION_3D,
 } from './example.js';
 
 export type SceneDraw = (
@@ -247,6 +249,90 @@ export function parametricScene(cues: { plotStart: number }): SceneDraw {
 
           // Draw curve
           drawParametricCurve(ctx, CURVES[i], plotRect, VIEWPORT);
+        }
+      }
+
+      ctx.globalAlpha = 1;
+    }
+  };
+}
+
+export function parametric3DScene(cues: { plotStart: number }): SceneDraw {
+  return async (ctx, localT, { width, height, duration }) => {
+    const sectionIn = easeInOut(timeSlice(localT, cues.plotStart, cues.plotStart + FADE));
+    const sectionOut = 1 - easeInOut(timeSlice(localT, duration - FADE, duration));
+    const sectionAlpha = Math.min(sectionIn, sectionOut);
+
+    if (sectionAlpha > 0) {
+      ctx.globalAlpha = sectionAlpha;
+
+      // Left side: formulas
+      const mapScale = 2.5;
+      const crossFade = 0.3;
+      const exampleDur = 2.5;
+      const rhsGap = 15;
+
+      const xPrefixM = tex.measure(TEX_X_MAPSTO);
+      const yPrefixM = tex.measure(TEX_Y_MAPSTO);
+      const zPrefixM = tex.measure(TEX_Z_MAPSTO);
+      const prefixW = Math.max(xPrefixM.width, yPrefixM.width, zPrefixM.width) * mapScale;
+
+      const leftMargin = 60;
+      const leftX = leftMargin;
+      const rhsX = leftX + prefixW + rhsGap;
+
+      // Three rows centered vertically, ~70px apart
+      const rowGap = 70;
+      const centerY = height / 2;
+      const xBaselineY = centerY - rowGap;
+      const yBaselineY = centerY;
+      const zBaselineY = centerY + rowGap;
+
+      // Draw persistent prefixes
+      await tex.draw(ctx, TEX_X_MAPSTO, leftX, xBaselineY - xPrefixM.baseline * mapScale, mapScale);
+      await tex.draw(ctx, TEX_Y_MAPSTO, leftX, yBaselineY - yPrefixM.baseline * mapScale, mapScale);
+      await tex.draw(ctx, TEX_Z_MAPSTO, leftX, zBaselineY - zPrefixM.baseline * mapScale, mapScale);
+
+      // Right side: 3D plot area
+      const plotSize = 450;
+      const plotRect: PlotRect = {
+        x: width * 0.48,
+        y: (height - plotSize) / 2,
+        w: plotSize * 1.3,
+        h: plotSize,
+      };
+
+      // Draw 3D axes
+      ctx.globalAlpha = sectionAlpha;
+      await draw3DAxes(ctx, plotRect, VIEWPORT_3D, PROJECTION_3D, tex, X, Y, Z);
+
+      // Cycling through curves
+      for (let i = 0; i < MAPPING_RHS_3D.length; i++) {
+        const [xRhs, yRhs, zRhs] = MAPPING_RHS_3D[i];
+        const start = cues.plotStart + i * exampleDur;
+        const end = start + exampleDur;
+
+        if (localT < start || localT > end + crossFade) continue;
+
+        const fadeIn = easeInOut(timeSlice(localT, start, start + crossFade));
+        const fadeOut = (i < MAPPING_RHS_3D.length - 1)
+          ? 1 - easeInOut(timeSlice(localT, end - crossFade, end))
+          : 1 - easeInOut(timeSlice(localT, duration - FADE, duration));
+        const alpha = Math.min(fadeIn, fadeOut) * sectionAlpha;
+
+        if (alpha > 0) {
+          ctx.globalAlpha = alpha;
+
+          // Draw RHS formulas
+          const xM = tex.measure(xRhs);
+          const yM = tex.measure(yRhs);
+          const zM = tex.measure(zRhs);
+          await tex.draw(ctx, xRhs, rhsX, xBaselineY - xM.baseline * mapScale, mapScale);
+          await tex.draw(ctx, yRhs, rhsX, yBaselineY - yM.baseline * mapScale, mapScale);
+          await tex.draw(ctx, zRhs, rhsX, zBaselineY - zM.baseline * mapScale, mapScale);
+
+          // Draw 3D curve
+          draw3DParametricCurve(ctx, CURVES_3D[i], plotRect, VIEWPORT_3D, PROJECTION_3D);
         }
       }
 

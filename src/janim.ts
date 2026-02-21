@@ -193,6 +193,7 @@ export interface AnimationController {
   setResolution(width: number, height: number): void;
   isPlaying(): boolean;
   currentTime(): number;
+  updateAnimation(fn: AnimationFn): void;
   readonly duration: number;
 }
 
@@ -203,6 +204,7 @@ export function runInBrowser(
 ): AnimationController {
   const ctx = canvas.getContext('2d')!;
   const duration = config.duration;
+  let currentAnimFn = animFn;
 
   let resW = config.width;
   let resH = config.height;
@@ -220,7 +222,7 @@ export function runInBrowser(
     ctx.save();
     ctx.scale(scaleX, scaleY);
     ctx.clearRect(0, 0, config.width, config.height);
-    await animFn(ctx, currentT);
+    await currentAnimFn(ctx, currentT);
     ctx.restore();
   }
 
@@ -266,6 +268,10 @@ export function runInBrowser(
       resH = height;
       canvas.width = resW;
       canvas.height = resH;
+      if (!playing) render();
+    },
+    updateAnimation(fn: AnimationFn) {
+      currentAnimFn = fn;
       if (!playing) render();
     },
     isPlaying() { return playing; },

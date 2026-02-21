@@ -1,4 +1,5 @@
-import { runInBrowser } from './janim.js';
+/// <reference types="vite/client" />
+import { runInBrowser, AnimationController } from './janim.js';
 import { config, setup, animate } from './example.js';
 
 const canvas = document.getElementById('canvas') as HTMLCanvasElement;
@@ -7,10 +8,12 @@ const restartBtn = document.getElementById('restart') as HTMLButtonElement;
 const scrubber = document.getElementById('scrubber') as HTMLInputElement;
 const timeDisplay = document.getElementById('time-display') as HTMLSpanElement;
 
-setup().then(() => {
-  const ctrl = runInBrowser(canvas, config, animate);
+let ctrl: AnimationController;
 
-  // Scrubber range matches duration
+async function init() {
+  await setup();
+  ctrl = runInBrowser(canvas, config, animate);
+
   scrubber.max = String(config.duration);
   scrubber.step = '0.01';
 
@@ -32,10 +35,11 @@ setup().then(() => {
     ctrl.seek(0);
   });
 
-  // Scroll wheel zoom
   let zoom = 1;
   canvas.style.width = `${config.width}px`;
   canvas.style.height = `${config.height}px`;
+  canvas.style.transform = '';
+  canvas.style.transformOrigin = '';
   canvas.addEventListener('wheel', (e) => {
     e.preventDefault();
     const factor = e.deltaY < 0 ? 1.1 : 1 / 1.1;
@@ -48,11 +52,23 @@ setup().then(() => {
     );
   }, { passive: false });
 
-  let scrubbing = false;
-  scrubber.addEventListener('mousedown', () => { scrubbing = true; ctrl.pause(); });
+  scrubber.addEventListener('mousedown', () => { ctrl.pause(); });
   scrubber.addEventListener('input', () => { ctrl.seek(parseFloat(scrubber.value)); });
-  scrubber.addEventListener('mouseup', () => { scrubbing = false; });
+}
 
-}).catch((err) => {
+init().catch((err) => {
   console.error('Failed to set up animation:', err);
 });
+
+if (import.meta.hot) {
+  import.meta.hot.accept('./example.js', async (mod: any) => {
+    if (!mod || !ctrl) return;
+    const savedT = ctrl.currentTime();
+    const wasPlaying = ctrl.isPlaying();
+    if (wasPlaying) ctrl.pause();
+    await mod.setup();
+    ctrl.updateAnimation(mod.animate);
+    ctrl.seek(savedT);
+    if (wasPlaying) ctrl.play();
+  });
+}

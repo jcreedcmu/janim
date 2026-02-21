@@ -80,6 +80,136 @@ export async function drawPlotAxes(
   }
 }
 
+// ---------------------------------------------------------------------------
+// 3D utilities
+// ---------------------------------------------------------------------------
+
+export interface CurveDef3D {
+  xFn: (t: number) => number;
+  yFn: (t: number) => number;
+  zFn: (t: number) => number;
+  tRange: [number, number];
+}
+
+export interface Projection3D {
+  project(x: number, y: number, z: number): [number, number];
+}
+
+export function createProjection(azimuth: number, elevation: number, distance: number): Projection3D {
+  const ca = Math.cos(azimuth), sa = Math.sin(azimuth);
+  const ce = Math.cos(elevation), se = Math.sin(elevation);
+  return {
+    project(x: number, y: number, z: number): [number, number] {
+      // Rotate around Z by azimuth
+      const x1 = ca * x + sa * y;
+      const y1 = -sa * x + ca * y;
+      // Rotate around X by elevation
+      const x2 = x1;
+      const y2 = ce * y1 + se * z;
+      const z2 = -se * y1 + ce * z;
+      // Perspective division (z2 > 0 = closer to camera = larger)
+      const scale = distance / (distance - z2);
+      return [x2 * scale, y2 * scale];
+    },
+  };
+}
+
+export function computeFixedViewport3D(curves: CurveDef3D[], projection: Projection3D): Viewport {
+  const N = 200;
+  let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity;
+
+  function include(px: number, py: number) {
+    if (px < minX) minX = px;
+    if (px > maxX) maxX = px;
+    if (py < minY) minY = py;
+    if (py > maxY) maxY = py;
+  }
+
+  // Sample all curves
+  for (const { xFn, yFn, zFn, tRange } of curves) {
+    for (let i = 0; i <= N; i++) {
+      const t = tRange[0] + (tRange[1] - tRange[0]) * (i / N);
+      const [px, py] = projection.project(xFn(t), yFn(t), zFn(t));
+      include(px, py);
+    }
+  }
+
+  // Include projected axis endpoints
+  const axisLen = 6;
+  for (const [ax, ay, az] of [[axisLen, 0, 0], [-axisLen, 0, 0], [0, axisLen, 0], [0, -axisLen, 0], [0, 0, axisLen], [0, 0, -axisLen]] as [number, number, number][]) {
+    const [px, py] = projection.project(ax, ay, az);
+    include(px, py);
+  }
+
+  if (maxX - minX < 0.01) { minX -= 1; maxX += 1; }
+  if (maxY - minY < 0.01) { minY -= 1; maxY += 1; }
+  const mx = (maxX - minX) * 0.15;
+  const my = (maxY - minY) * 0.15;
+  return { minX: minX - mx, maxX: maxX + mx, minY: minY - my, maxY: maxY + my };
+}
+
+export async function draw3DAxes(
+  ctx: CanvasRenderingContext2D,
+  plotRect: PlotRect,
+  viewport: Viewport,
+  projection: Projection3D,
+  texRenderer: TexRenderer,
+  xLabel: string,
+  yLabel: string,
+  zLabel: string,
+) {
+  const { toCanvasX, toCanvasY } = plotToCanvas(plotRect, viewport);
+  const [ox, oy] = projection.project(0, 0, 0);
+
+  ctx.strokeStyle = '#999';
+  ctx.lineWidth = 1.5;
+
+  const axisLen = 6;
+  const axes: [number, number, number][] = [[axisLen, 0, 0], [0, axisLen, 0], [0, 0, axisLen]];
+  const labels = [xLabel, yLabel, zLabel];
+  const labelScale = 2.5;
+
+  for (let i = 0; i < 3; i++) {
+    const [px, py] = projection.project(...axes[i]);
+    ctx.beginPath();
+    ctx.moveTo(toCanvasX(ox), toCanvasY(oy));
+    ctx.lineTo(toCanvasX(px), toCanvasY(py));
+    ctx.stroke();
+
+    const m = texRenderer.measure(labels[i]);
+    const cx = toCanvasX(px);
+    const cy = toCanvasY(py);
+    await texRenderer.draw(ctx, labels[i], cx - m.width * labelScale / 2, cy - m.height * labelScale - 6, labelScale);
+  }
+}
+
+export function draw3DParametricCurve(
+  ctx: CanvasRenderingContext2D,
+  curve: CurveDef3D,
+  plotRect: PlotRect,
+  viewport: Viewport,
+  projection: Projection3D,
+) {
+  const { xFn, yFn, zFn, tRange } = curve;
+  const N = 200;
+  const { toCanvasX, toCanvasY } = plotToCanvas(plotRect, viewport);
+
+  ctx.strokeStyle = '#3e8aff';
+  ctx.lineWidth = 3;
+  ctx.lineJoin = 'round';
+  ctx.lineCap = 'round';
+  ctx.beginPath();
+  for (let i = 0; i <= N; i++) {
+    const t = tRange[0] + (tRange[1] - tRange[0]) * (i / N);
+    const [px, py] = projection.project(xFn(t), yFn(t), zFn(t));
+    const cx = toCanvasX(px);
+    const cy = toCanvasY(py);
+    if (i === 0) ctx.moveTo(cx, cy);
+    else ctx.lineTo(cx, cy);
+  }
+  ctx.stroke();
+}
+
 export function drawParametricCurve(
   ctx: CanvasRenderingContext2D,
   curve: CurveDef,
