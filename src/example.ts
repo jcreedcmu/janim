@@ -4,8 +4,8 @@ const TEX_EMC2 = 'E = mc^2';
 const TEX_INTEGRAL = '\\int_0^\\infty e^{-x}\\, dx = 1';
 
 export const config: AnimationConfig = {
-  width: 960,
-  height: 540,
+  width: 1920,
+  height: 1080,
   duration: 5,
   fps: 30,
 };
