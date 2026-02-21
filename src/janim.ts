@@ -71,6 +71,15 @@ export class TexRenderer {
     const width = widthMatch ? parseDimension(widthMatch[1]) : 100;
     const height = heightMatch ? parseDimension(heightMatch[1]) : 50;
 
+    // Pad the viewBox so antialiased pixels at glyph edges don't get clipped.
+    const VIEWBOX_PAD = 50; // in SVG coordinate units
+    const vbMatch = svgString.match(/viewBox="([^"]+)"/);
+    if (vbMatch) {
+      const [minX, minY, vbW, vbH] = vbMatch[1].split(' ').map(Number);
+      const padded = `${minX - VIEWBOX_PAD} ${minY - VIEWBOX_PAD} ${vbW + 2 * VIEWBOX_PAD} ${vbH + 2 * VIEWBOX_PAD}`;
+      svgString = svgString.replace(`viewBox="${vbMatch[1]}"`, `viewBox="${padded}"`);
+    }
+
     // Replace dimensions with placeholders so we can stamp in the exact
     // target pixel size at draw time (avoids any raster rescaling).
     if (widthMatch) svgString = svgString.replace(`width="${widthMatch[1]}"`, `width="%WIDTH%"`);
