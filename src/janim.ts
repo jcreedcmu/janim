@@ -187,7 +187,7 @@ export function runInBrowser(
   canvas.width = resW;
   canvas.height = resH;
 
-  let playing = true;
+  let playing = false;
   let currentT = 0;
   let lastTimestamp: number | null = null;
   let rafId = 0;
@@ -219,7 +219,7 @@ export function runInBrowser(
     }
   }
 
-  rafId = requestAnimationFrame(frame);
+  render();
 
   return {
     play() {
