@@ -192,8 +192,40 @@ export function draw3DParametricCurve(
 ) {
   const { xFn, yFn, zFn, tRange } = curve;
   const N = 200;
+  const STRUT_INTERVAL = 10; // draw a vertical strut every this many samples
   const { toCanvasX, toCanvasY } = plotToCanvas(plotRect, viewport);
 
+  // Shadow: project curve onto xy plane (z=0)
+  ctx.strokeStyle = '#aaa';
+  ctx.lineWidth = 1.5;
+  ctx.lineJoin = 'round';
+  ctx.lineCap = 'round';
+  ctx.beginPath();
+  for (let i = 0; i <= N; i++) {
+    const t = tRange[0] + (tRange[1] - tRange[0]) * (i / N);
+    const [sx, sy] = projection.project(xFn(t), yFn(t), 0);
+    const cx = toCanvasX(sx);
+    const cy = toCanvasY(sy);
+    if (i === 0) ctx.moveTo(cx, cy);
+    else ctx.lineTo(cx, cy);
+  }
+  ctx.stroke();
+
+  // Vertical struts from curve to shadow
+  ctx.strokeStyle = '#aaa';
+  ctx.lineWidth = 1;
+  for (let i = 0; i <= N; i += STRUT_INTERVAL) {
+    const t = tRange[0] + (tRange[1] - tRange[0]) * (i / N);
+    const x = xFn(t), y = yFn(t), z = zFn(t);
+    const [px, py] = projection.project(x, y, z);
+    const [sx, sy] = projection.project(x, y, 0);
+    ctx.beginPath();
+    ctx.moveTo(toCanvasX(px), toCanvasY(py));
+    ctx.lineTo(toCanvasX(sx), toCanvasY(sy));
+    ctx.stroke();
+  }
+
+  // Main curve
   ctx.strokeStyle = '#3e8aff';
   ctx.lineWidth = 3;
   ctx.lineJoin = 'round';

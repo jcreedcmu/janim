@@ -70,15 +70,22 @@ export const MAPPING_RHS_3D: [string, string, string][] = [
 ];
 export const ALL_RHS_3D = MAPPING_RHS_3D.flat();
 
+const S3 = 2.5; // scale factor for 3D curves
 export const CURVES_3D: CurveDef3D[] = [
-  { xFn: t => t, yFn: t => t ** 2, zFn: t => t ** 3, tRange: [-1.2, 1.2] },
-  { xFn: t => t ** 3 + 1, yFn: t => t ** 2 - t, zFn: t => 2 * t, tRange: [-1.5, 1.5] },
-  { xFn: t => t ** 2 - 1, yFn: t => t, zFn: t => t ** 3 - t, tRange: [-1.3, 1.3] },
-  { xFn: t => 0, yFn: t => t, zFn: t => t ** 2, tRange: [-1.5, 1.5] },
+  { xFn: t => S3 * t, yFn: t => S3 * t ** 2, zFn: t => S3 * t ** 3, tRange: [-1.2, 1.2] },
+  { xFn: t => S3 * (t ** 3 + 1), yFn: t => S3 * (t ** 2 - t), zFn: t => S3 * 2 * t, tRange: [-2.95, 1.05] },
+  { xFn: t => S3 * (t ** 2 - 1), yFn: t => S3 * t, zFn: t => S3 * (t ** 3 - t), tRange: [-1.3, 1.3] },
+  { xFn: t => 0, yFn: t => S3 * t, zFn: t => S3 * t ** 2, tRange: [-1.5, 1.5] },
 ];
 
-export const PROJECTION_3D = createProjection(0.3, 1.1, 10);
-export const VIEWPORT_3D: Viewport = computeFixedViewport3D(CURVES_3D, PROJECTION_3D);
+export const PROJ_AZIMUTH = 0.3;
+export const PROJ_ELEVATION = 1.1;
+export const PROJ_DISTANCE = 10;
+export const PROJ_ROTATION_SPEED = 0.15; // radians per second
+
+export const VIEWPORT_3D: Viewport = computeFixedViewport3D(
+  CURVES_3D, createProjection(PROJ_AZIMUTH, PROJ_ELEVATION, PROJ_DISTANCE),
+);
 
 export const config: AnimationConfig = {
   width: 1920,

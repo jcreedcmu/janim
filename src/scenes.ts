@@ -1,5 +1,5 @@
 import { easeInOut, timeSlice } from './janim.js';
-import { PlotRect, drawPlotAxes, drawParametricCurve, draw3DAxes, draw3DParametricCurve } from './plot.js';
+import { PlotRect, drawPlotAxes, drawParametricCurve, draw3DAxes, draw3DParametricCurve, createProjection } from './plot.js';
 import {
   tex, FADE, TITLE, SUBTITLE,
   RING_LABELS, POLY_GROUPS,
@@ -7,7 +7,8 @@ import {
   TEX_X_MAPSTO, TEX_Y_MAPSTO, MAPPING_RHS, ALL_RHS,
   CURVES, VIEWPORT, X, Y,
   TEX_Z_MAPSTO, MAPPING_RHS_3D, Z,
-  CURVES_3D, VIEWPORT_3D, PROJECTION_3D,
+  CURVES_3D, VIEWPORT_3D,
+  PROJ_AZIMUTH, PROJ_ELEVATION, PROJ_DISTANCE, PROJ_ROTATION_SPEED,
 } from './example.js';
 
 export type SceneDraw = (
@@ -302,9 +303,16 @@ export function parametric3DScene(cues: { plotStart: number }): SceneDraw {
         h: plotSize,
       };
 
+      // Per-frame projection with animated azimuth rotation
+      const proj = createProjection(
+        PROJ_AZIMUTH + PROJ_ROTATION_SPEED * localT,
+        PROJ_ELEVATION,
+        PROJ_DISTANCE,
+      );
+
       // Draw 3D axes
       ctx.globalAlpha = sectionAlpha;
-      await draw3DAxes(ctx, plotRect, VIEWPORT_3D, PROJECTION_3D, tex, X, Y, Z);
+      await draw3DAxes(ctx, plotRect, VIEWPORT_3D, proj, tex, X, Y, Z);
 
       // Cycling through curves
       for (let i = 0; i < MAPPING_RHS_3D.length; i++) {
@@ -332,7 +340,7 @@ export function parametric3DScene(cues: { plotStart: number }): SceneDraw {
           await tex.draw(ctx, zRhs, rhsX, zBaselineY - zM.baseline * mapScale, mapScale);
 
           // Draw 3D curve
-          draw3DParametricCurve(ctx, CURVES_3D[i], plotRect, VIEWPORT_3D, PROJECTION_3D);
+          draw3DParametricCurve(ctx, CURVES_3D[i], plotRect, VIEWPORT_3D, proj);
         }
       }
 
