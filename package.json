@@ -1,0 +1,19 @@
+{
+  "name": "janim",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "render": "tsx src/render.ts"
+  },
+  "dependencies": {
+    "mathjax-full": "^3.2.2"
+  },
+  "devDependencies": {
+    "@napi-rs/canvas": "^0.1.62",
+    "tsx": "^4.7.0",
+    "typescript": "^5.3.3",
+    "vite": "^7.3.1"
+  }
+}
