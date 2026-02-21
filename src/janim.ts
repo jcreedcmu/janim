@@ -164,31 +164,76 @@ export class TexRenderer {
 // Browser runner
 // ---------------------------------------------------------------------------
 
+export interface AnimationController {
+  play(): void;
+  pause(): void;
+  seek(t: number): void;
+  isPlaying(): boolean;
+  currentTime(): number;
+  readonly duration: number;
+}
+
 export function runInBrowser(
   canvas: HTMLCanvasElement,
   config: AnimationConfig,
   animFn: AnimationFn,
-): void {
+): AnimationController {
   canvas.width = config.width;
   canvas.height = config.height;
   const ctx = canvas.getContext('2d')!;
   const duration = config.duration;
-  let startTime: number | null = null;
+
+  let playing = true;
+  let currentT = 0;
+  let lastTimestamp: number | null = null;
+  let rafId = 0;
+
+  async function render() {
+    ctx.clearRect(0, 0, config.width, config.height);
+    await animFn(ctx, currentT);
+  }
 
   async function frame(timestamp: number) {
-    if (startTime === null) startTime = timestamp;
-    const elapsed = (timestamp - startTime) / 1000;
-    const t = Math.min(elapsed, duration);
+    if (lastTimestamp !== null) {
+      const dt = (timestamp - lastTimestamp) / 1000;
+      currentT = Math.min(currentT + dt, duration);
+    }
+    lastTimestamp = timestamp;
 
-    ctx.clearRect(0, 0, config.width, config.height);
-    await animFn(ctx, t);
+    await render();
 
-    if (t < duration) {
-      requestAnimationFrame(frame);
+    if (currentT >= duration) {
+      playing = false;
+    }
+    if (playing) {
+      rafId = requestAnimationFrame(frame);
     }
   }
 
-  requestAnimationFrame(frame);
+  rafId = requestAnimationFrame(frame);
+
+  return {
+    play() {
+      if (playing) return;
+      if (currentT >= duration) currentT = 0;
+      playing = true;
+      lastTimestamp = null;
+      rafId = requestAnimationFrame(frame);
+    },
+    pause() {
+      playing = false;
+      lastTimestamp = null;
+      cancelAnimationFrame(rafId);
+    },
+    seek(t: number) {
+      currentT = Math.max(0, Math.min(t, duration));
+      lastTimestamp = null;
+      render();
+    },
+    isPlaying() { return playing; },
+    currentTime() { return currentT; },
+    duration,
+  };
 }
 
 // ---------------------------------------------------------------------------
