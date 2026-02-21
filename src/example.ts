@@ -86,7 +86,9 @@ export const PROJ_ROTATION_SPEED = 0.15; // radians per second
 // --- Duality / conclusion ---
 const DUALITY_2D = `\\mathbb{R}[${X},${Y}] \\to \\mathbb{R}[${T}] \\quad\\longleftrightarrow\\quad \\text{curves in } \\mathbb{R}^2`;
 const DUALITY_3D = `\\mathbb{R}[${X},${Y},${Z}] \\to \\mathbb{R}[${T}] \\quad\\longleftrightarrow\\quad \\text{curves in } \\mathbb{R}^3`;
-const DUALITY_GENERAL = `\\mathbb{R}[${X}_1,\\ldots,${X}_n] \\to \\mathbb{R}[${T}_1,\\ldots,${T}_p] \\quad\\longleftrightarrow\\quad \\mathbb{R}^p \\to \\mathbb{R}^n`;
+const N = '{\\color{#b100d1}{n}}';
+const P = '{\\color{#00b2bb}{p}}';
+const DUALITY_GENERAL = `\\mathbb{R}[${X}_1,\\ldots,${X}_${N}] \\to \\mathbb{R}[${T}_1,\\ldots,${T}_${P}] \\quad\\longleftrightarrow\\quad \\mathbb{R}^${P} \\to \\mathbb{R}^${N}`;
 const DUALITY_CLOSING_EXPR = `\\text{algebra} \\quad\\longleftrightarrow\\quad \\text{geometry}`;
 export const DUALITY_ROWS = [DUALITY_2D, DUALITY_3D, DUALITY_GENERAL];
 export const DUALITY_CLOSING = DUALITY_CLOSING_EXPR;
