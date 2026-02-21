@@ -1,4 +1,4 @@
-import { AnimationConfig, AnimationFn, TexRenderer, lerp, easeInOut, timeSlice } from './janim.js';
+import { AnimationConfig, AnimationFn, TexRenderer, palette, lerp, easeInOut, timeSlice } from './janim.js';
 
 const TEX_EMC2 = 'E = mc^2';
 const TEX_INTEGRAL = '\\int_0^\\infty e^{-x}\\, dx = 1';
@@ -19,9 +19,25 @@ export async function setup(): Promise<void> {
 export const animate: AnimationFn = async (ctx, t) => {
   const { width, height } = config;
 
-  // Dark background
-  ctx.fillStyle = '#1a1a2e';
+  ctx.fillStyle = '#faf5e7';
   ctx.fillRect(0, 0, width, height);
+
+  // --- Color blobs ---
+  const cols = 4;
+  const rows = 3;
+  const blobR = 40;
+  const spacingX = width / (cols + 1);
+  const spacingY = height / (rows + 1);
+  for (let i = 0; i < palette.length; i++) {
+    const col = i % cols;
+    const row = Math.floor(i / cols);
+    const cx = spacingX * (col + 1);
+    const cy = spacingY * (row + 1);
+    ctx.fillStyle = palette[i];
+    ctx.beginPath();
+    ctx.arc(cx, cy, blobR, 0, Math.PI * 2);
+    ctx.fill();
+  }
 
   // --- Phase 1: Fade in E = mc^2 (0–1s) ---
   const p1 = easeInOut(timeSlice(t, 0, 1));

@@ -66,8 +66,8 @@ export class TexRenderer {
     // innerHTML strips the <mjx-container> wrapper, giving us just the <svg>
     let svgString = this.adaptor.innerHTML(node);
 
-    // Replace currentColor with white so it renders visibly in an <img> context
-    svgString = svgString.replace(/currentColor/g, '#ffffff');
+    // Replace currentColor with black so it renders visibly in an <img> context
+    svgString = svgString.replace(/currentColor/g, '#000000');
 
     // Extract logical dimensions (ex → px)
     const widthMatch = svgString.match(/width="([^"]+)"/);
@@ -302,6 +302,21 @@ export function easeInOut(t: number): number {
     ? 2 * t * t
     : 1 - Math.pow(-2 * t + 2, 2) / 2;
 }
+
+export const palette = [
+  "#3e8aff",
+  "#003aba",
+  "#ff6b66",
+  "#b28800",
+  "#ffc600",
+  "#f68000",
+  "#763a00",
+  "#6eb200",
+  "#b100d1",
+  "#ea66ff",
+  "#00767d",
+  "#00b2bb",
+] as const;
 
 /** Clamp and normalize `t` into [0,1] over the interval [start, end]. */
 export function timeSlice(t: number, start: number, end: number): number {
