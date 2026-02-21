@@ -42,6 +42,8 @@ export function titleScene(): SceneDraw {
       ctx.fillText(TITLE, width / 2, height / 2 - 40);
       ctx.font = 'italic 48px Roboto, sans-serif';
       ctx.fillText(SUBTITLE, width / 2, height / 2 + 40);
+      ctx.font = '36px Roboto, sans-serif';
+      ctx.fillText('(Episode 1)', width / 2, height / 2 + 100);
       ctx.globalAlpha = 1;
     }
   };
