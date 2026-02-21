@@ -10,6 +10,7 @@ import {
   CURVES_3D, VIEWPORT_3D,
   PROJ_AZIMUTH, PROJ_ELEVATION, PROJ_DISTANCE, PROJ_ROTATION_SPEED,
   DUALITY_ROWS, DUALITY_CLOSING,
+  N_COLOR, P_COLOR,
 } from './example.js';
 
 export type SceneDraw = (
@@ -350,6 +351,51 @@ export function parametric3DScene(cues: { plotStart: number }): SceneDraw {
   };
 }
 
+function drawBezierArrow(
+  ctx: CanvasRenderingContext2D,
+  x1: number, y1: number,
+  x2: number, y2: number,
+  color: string,
+  bulge: number,
+) {
+  const midX = (x1 + x2) / 2;
+  const midY = (y1 + y2) / 2 + bulge;
+
+  // Two quadratic segments: vertical endpoints, horizontal at the bulge midpoint
+  // Segment 1: (x1,y1) → (midX,midY), control (x1, midY)
+  // Segment 2: (midX,midY) → (x2,y2), control (x2, midY)
+  ctx.strokeStyle = color;
+  ctx.lineWidth = 2;
+  ctx.beginPath();
+  ctx.moveTo(x1, y1);
+  ctx.quadraticCurveTo(x1, midY, midX, midY);
+  ctx.quadraticCurveTo(x2, midY, x2, y2);
+  ctx.stroke();
+
+  // Arrowheads — tangent is vertical at both endpoints, so triangles are simple
+  const arrowLen = 14;
+  const arrowW = 8; // half-width of arrowhead base
+  ctx.fillStyle = color;
+
+  // Destination arrowhead: curve arrives from bulge side, tip points away
+  const dDir = y2 > midY ? 1 : -1; // direction from midpoint toward endpoint
+  ctx.beginPath();
+  ctx.moveTo(x2, y2 + dDir * arrowLen); // tip, beyond endpoint
+  ctx.lineTo(x2 - arrowW, y2);          // base left
+  ctx.lineTo(x2 + arrowW, y2);          // base right
+  ctx.closePath();
+  ctx.fill();
+
+  // Source arrowhead: curve arrives from bulge side, tip points away
+  const sDir = y1 > midY ? 1 : -1;
+  ctx.beginPath();
+  ctx.moveTo(x1, y1 + sDir * arrowLen); // tip, beyond endpoint
+  ctx.lineTo(x1 - arrowW, y1);          // base left
+  ctx.lineTo(x1 + arrowW, y1);          // base right
+  ctx.closePath();
+  ctx.fill();
+}
+
 export function dualityScene(): SceneDraw {
   return async (ctx, localT, { width, height, duration }) => {
     const sectionOut = 1 - easeInOut(timeSlice(localT, duration - FADE, duration));
@@ -358,8 +404,9 @@ export function dualityScene(): SceneDraw {
     const rowAppear = [0, 5, 13]; // when each table row fades in
     const tableFadeOut = 17; // when the whole table fades out
 
-    // Progressive table of correspondences
     const tableOut = 1 - easeInOut(timeSlice(localT, tableFadeOut - 0.3, tableFadeOut));
+
+    // Progressive table of correspondences
     for (let i = 0; i < DUALITY_ROWS.length; i++) {
       if (localT < rowAppear[i]) continue;
       const fadeIn = easeInOut(timeSlice(localT, rowAppear[i], rowAppear[i] + 0.3));
@@ -369,6 +416,32 @@ export function dualityScene(): SceneDraw {
       ctx.globalAlpha = alpha;
       const cy = height / 2 + (i - 1) * rowGap;
       await drawTexCentered(ctx, DUALITY_ROWS[i], width / 2, cy, rowScale);
+
+      // Bezier arrows on the general row (row 2) linking matching n's and p's
+      if (i === 2) {
+        const expr = DUALITY_ROWS[2];
+        const markers = tex.markerPositions(expr, ['n1', 'p1', 'p2', 'n2']);
+        const size = tex.measure(expr);
+        const contentLeft = width / 2 - (size.width * rowScale) / 2;
+        const contentTop = cy - (size.height * rowScale) / 2;
+
+        const toCanvas = (id: string) => {
+          const m = markers.get(id)!;
+          return { x: contentLeft + m.x * rowScale, y: contentTop + m.y * rowScale };
+        };
+
+        const NUDGEX = 10;
+        const NUDGEY = 25;
+        if (markers.has('n1') && markers.has('n2')) {
+          const a = toCanvas('n1'), b = toCanvas('n2');
+          drawBezierArrow(ctx, a.x + NUDGEX, a.y + NUDGEY, b.x + NUDGEX, b.y + NUDGEY, N_COLOR, 200);
+        }
+        if (markers.has('p1') && markers.has('p2')) {
+          const a = toCanvas('p1'), b = toCanvas('p2');
+          drawBezierArrow(ctx, a.x + NUDGEX, a.y + NUDGEY, b.x + NUDGEX, b.y + NUDGEY, P_COLOR, 100);
+        }
+      }
+
       ctx.globalAlpha = 1;
     }
 

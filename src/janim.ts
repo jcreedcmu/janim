@@ -48,6 +48,8 @@ interface TexCacheEntry {
   padY: number;        // top padding offset in logical px
   drawWidth: number;   // total image width including padding
   drawHeight: number;  // total image height including padding
+  // Original (unpadded) viewBox for coordinate mapping
+  vbMinX: number; vbMinY: number; vbW: number; vbH: number;
   // Browser: pre-loaded Image (browser re-rasterizes SVG at draw size)
   browserImage?: ImageLike;
   // Node: loadImage function, cached at import time
@@ -88,13 +90,14 @@ export class TexRenderer {
     let padY = 0;
     let drawWidth = width;
     let drawHeight = height;
+    let vbMinX = 0, vbMinY = 0, vbW = width, vbH = height;
     if (vbMatch) {
-      const [minX, minY, vbW, vbH] = vbMatch[1].split(' ').map(Number);
-      baseline = (-minY / vbH) * height;
+      [vbMinX, vbMinY, vbW, vbH] = vbMatch[1].split(' ').map(Number);
+      baseline = (-vbMinY / vbH) * height;
 
       // Pad the viewBox so antialiased pixels at glyph edges don't get clipped.
       const VIEWBOX_PAD = 50;
-      const padded = `${minX - VIEWBOX_PAD} ${minY - VIEWBOX_PAD} ${vbW + 2 * VIEWBOX_PAD} ${vbH + 2 * VIEWBOX_PAD}`;
+      const padded = `${vbMinX - VIEWBOX_PAD} ${vbMinY - VIEWBOX_PAD} ${vbW + 2 * VIEWBOX_PAD} ${vbH + 2 * VIEWBOX_PAD}`;
       svgString = svgString.replace(`viewBox="${vbMatch[1]}"`, `viewBox="${padded}"`);
 
       // Track padding in logical pixels so draw() can compensate
@@ -109,7 +112,7 @@ export class TexRenderer {
     if (widthMatch) svgString = svgString.replace(`width="${widthMatch[1]}"`, `width="%WIDTH%"`);
     if (heightMatch) svgString = svgString.replace(`height="${heightMatch[1]}"`, `height="%HEIGHT%"`);
 
-    return { svgTemplate: svgString, width, height, baseline, padX, padY, drawWidth, drawHeight };
+    return { svgTemplate: svgString, width, height, baseline, padX, padY, drawWidth, drawHeight, vbMinX, vbMinY, vbW, vbH };
   }
 
   async prepare(expressions: string[]): Promise<void> {
@@ -118,8 +121,8 @@ export class TexRenderer {
     for (const expr of expressions) {
       if (this.cache.has(expr)) continue;
 
-      const { svgTemplate, width, height, baseline, padX, padY, drawWidth, drawHeight } = this.texToSvg(expr);
-      const entry: TexCacheEntry = { svgTemplate, width, height, baseline, padX, padY, drawWidth, drawHeight };
+      const { svgTemplate, width, height, baseline, padX, padY, drawWidth, drawHeight, vbMinX, vbMinY, vbW, vbH } = this.texToSvg(expr);
+      const entry: TexCacheEntry = { svgTemplate, width, height, baseline, padX, padY, drawWidth, drawHeight, vbMinX, vbMinY, vbW, vbH };
 
       if (isNode) {
         const { loadImage } = await import('@napi-rs/canvas');
@@ -179,6 +182,58 @@ export class TexRenderer {
     const entry = this.cache.get(tex);
     if (!entry) throw new Error(`TeX not prepared: "${tex}". Call prepare() first.`);
     return { width: entry.width, height: entry.height, baseline: entry.baseline };
+  }
+
+  /** Find positions of \cssId markers in a prepared expression.
+   *  Returns positions in logical content coordinates (before scaling). */
+  markerPositions(tex: string, ids: string[]): Map<string, { x: number; y: number }> {
+    const entry = this.cache.get(tex);
+    if (!entry) throw new Error(`TeX not prepared: "${tex}". Call prepare() first.`);
+
+    const { svgTemplate, width, height, vbMinX, vbMinY, vbW, vbH } = entry;
+    const result = new Map<string, { x: number; y: number }>();
+    const idSet = new Set(ids);
+
+    // Walk SVG <g> elements, accumulating affine transforms (translate + scale)
+    let a = 1, b = 1, tx = 0, ty = 0;
+    const stack: { a: number; b: number; tx: number; ty: number }[] = [];
+
+    const tagRegex = /<(\/?)g\b([^>]*?)>/g;
+    let m;
+    while ((m = tagRegex.exec(svgTemplate)) !== null) {
+      if (m[1] === '/') {
+        const prev = stack.pop();
+        if (prev) ({ a, b, tx, ty } = prev);
+      } else {
+        stack.push({ a, b, tx, ty });
+        const attrs = m[2];
+
+        const tMatch = attrs.match(/transform="([^"]+)"/);
+        if (tMatch) {
+          const tStr = tMatch[1];
+          const tr = tStr.match(/translate\(\s*([^,\s)]+)[\s,]*([^)]*)\)/);
+          if (tr) {
+            tx += a * parseFloat(tr[1]);
+            ty += b * (tr[2] ? parseFloat(tr[2]) : 0);
+          }
+          const sc = tStr.match(/scale\(\s*([^,\s)]+)[\s,]*([^)]*)\)/);
+          if (sc) {
+            a *= parseFloat(sc[1]);
+            b *= (sc[2] ? parseFloat(sc[2]) : parseFloat(sc[1]));
+          }
+        }
+
+        const idMatch = attrs.match(/id="([^"]+)"/);
+        if (idMatch && idSet.has(idMatch[1])) {
+          result.set(idMatch[1], {
+            x: ((tx - vbMinX) / vbW) * width,
+            y: ((ty - vbMinY) / vbH) * height,
+          });
+        }
+      }
+    }
+
+    return result;
   }
 }
 
