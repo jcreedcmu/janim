@@ -16,9 +16,10 @@ let ctrl: AnimationController;
 const WAVEFORM_BUCKETS = 3000;
 type Peaks = { min: Float32Array; max: Float32Array };
 let peaks: Peaks | null = null;
+let audioDuration = config.duration; // will be updated once audio is decoded
 
-function computePeaks(channelData: Float32Array, sampleRate: number, duration: number): Peaks {
-  const totalSamples = Math.min(channelData.length, Math.floor(sampleRate * duration));
+function computePeaks(channelData: Float32Array, sampleRate: number): Peaks {
+  const totalSamples = channelData.length;
   const samplesPerBucket = totalSamples / WAVEFORM_BUCKETS;
   const minArr = new Float32Array(WAVEFORM_BUCKETS);
   const maxArr = new Float32Array(WAVEFORM_BUCKETS);
@@ -56,11 +57,15 @@ const BUBBLE_PAD = 8;
 const BUBBLE_R = 8;
 const SCENE_CUE_COLOR = 'rgb(255, 220, 100)';
 const SUB_CUE_COLOR = 'rgb(140, 200, 255)';
+const ANIM_CUE_COLOR = 'rgb(255, 120, 120)';
 const CUE_LINE_COLOR_SCENE = 'rgb(255, 220, 100)';
 const CUE_LINE_COLOR_SUB = 'rgb(140, 200, 255)';
+const CUE_LINE_COLOR_ANIM = 'rgb(255, 120, 120)';
 
-function isSceneCue(id: string): boolean {
-  return id.startsWith('scene-');
+function cueCategory(id: string): 'anim' | 'scene' | 'sub' {
+  if (id.startsWith('anim-')) return 'anim';
+  if (id.startsWith('scene-')) return 'scene';
+  return 'sub';
 }
 
 const BUBBLE_ANGLE = -Math.PI / 4; // -45 degrees (up and to the right)
@@ -79,10 +84,12 @@ function drawCueMarkers(ctx: CanvasRenderingContext2D, w: number, h: number, top
     const x = timeToX(t, w);
     if (x < -100 * dpr || x > w + 100 * dpr) continue;
 
-    const scene = isSceneCue(cue.id);
+    const cat = cueCategory(cue.id);
+    const lineColor = cat === 'anim' ? CUE_LINE_COLOR_ANIM : cat === 'scene' ? CUE_LINE_COLOR_SCENE : CUE_LINE_COLOR_SUB;
+    const bubbleColor = cat === 'anim' ? ANIM_CUE_COLOR : cat === 'scene' ? SCENE_CUE_COLOR : SUB_CUE_COLOR;
 
     // Vertical stem
-    ctx.strokeStyle = scene ? CUE_LINE_COLOR_SCENE : CUE_LINE_COLOR_SUB;
+    ctx.strokeStyle = lineColor;
     ctx.lineWidth = 3 * dpr;
     ctx.beginPath();
     ctx.moveTo(x, topMargin - 20 * dpr);
@@ -100,7 +107,7 @@ function drawCueMarkers(ctx: CanvasRenderingContext2D, w: number, h: number, top
     const bx = BUBBLE_NUDGE * dpr;
     const by = -bubbleH - bubblePad;
 
-    ctx.fillStyle = scene ? SCENE_CUE_COLOR : SUB_CUE_COLOR;
+    ctx.fillStyle = bubbleColor;
     ctx.beginPath();
     ctx.roundRect(bx, by, bw, bubbleH, bubbleR);
     ctx.fill();
@@ -114,13 +121,13 @@ function drawCueMarkers(ctx: CanvasRenderingContext2D, w: number, h: number, top
   }
 }
 
-function drawWaveform(peaks: Peaks, cvs: HTMLCanvasElement, currentT: number, duration: number, dpr: number) {
+function drawWaveform(peaks: Peaks, cvs: HTMLCanvasElement, currentT: number, animDuration: number, dpr: number) {
   const ctx = cvs.getContext('2d')!;
   const w = cvs.width;
   const h = cvs.height;
   const bubbleMargin = BUBBLE_TOP_MARGIN * dpr;
   const waveTop = WAVEFORM_TOP_MARGIN * dpr;
-  const waveH = h - waveTop; // height available for the waveform
+  const waveH = h - waveTop;
   ctx.fillStyle = '#222';
   ctx.fillRect(0, 0, w, h);
 
@@ -130,11 +137,10 @@ function drawWaveform(peaks: Peaks, cvs: HTMLCanvasElement, currentT: number, du
   // Draw one bar per pixel column, sampling from the fixed-size peaks array
   for (let px = 0; px < w; px++) {
     const t = xToTime(px, w);
-    const idx = Math.round((t / duration) * buckets);
+    const idx = Math.round((t / audioDuration) * buckets);
     if (idx < 0 || idx >= buckets) continue;
     const minVal = Math.max(-1, peaks.min[idx] * 3);
     const maxVal = Math.min(1, peaks.max[idx] * 3);
-    // Map [-1,1] within the waveform region
     const yMin = waveTop + ((1 - maxVal) / 2) * waveH;
     const yMax = waveTop + ((1 - minVal) / 2) * waveH;
     ctx.fillStyle = px < playheadX ? '#e94560' : '#555';
@@ -195,9 +201,11 @@ function hitTestCue(clientX: number, clientY: number, dpr: number): string | nul
 }
 
 // --- Sync helpers ---
+// Audio element is the source of truth for current time.
+// The animation controller is kept in sync but clamped to its own duration.
 function syncPlay() {
-  ctrl.play();
   audio.play();
+  if (audio.currentTime <= config.duration) ctrl.play();
 }
 
 function syncPause() {
@@ -206,8 +214,8 @@ function syncPause() {
 }
 
 function syncSeek(t: number) {
-  ctrl.seek(t);
   audio.currentTime = t;
+  ctrl.seek(Math.min(t, config.duration));
 }
 
 // --- Init ---
@@ -232,7 +240,9 @@ async function init() {
     const audioCtx = new AudioContext();
     const decoded = await audioCtx.decodeAudioData(buf);
     const channelData = decoded.getChannelData(0);
-    peaks = computePeaks(channelData, decoded.sampleRate, config.duration);
+    audioDuration = decoded.duration;
+    viewEnd = audioDuration;
+    peaks = computePeaks(channelData, decoded.sampleRate);
     audioCtx.close();
   } catch (err) {
     console.warn('Could not load audio for waveform:', err);
@@ -244,11 +254,16 @@ async function init() {
 
   // UI update loop
   function updateUI() {
-    const t = ctrl.currentTime();
-    timeDisplay.textContent = `${t.toFixed(2)}s / ${ctrl.duration.toFixed(1)}s`;
-    playPauseBtn.textContent = ctrl.isPlaying() ? '\u23F8\uFE0E' : '\u25B6\uFE0E';
+    const t = audio.currentTime;
+    // Keep animation controller in sync (clamped to animation range)
+    if (!Number.isNaN(t)) {
+      ctrl.seek(Math.min(t, config.duration));
+    }
+    timeDisplay.textContent = `${t.toFixed(2)}s / ${audioDuration.toFixed(1)}s`;
+    const playing = !audio.paused && !audio.ended;
+    playPauseBtn.textContent = playing ? '\u23F8\uFE0E' : '\u25B6\uFE0E';
     if (peaks) {
-      drawWaveform(peaks, waveformCanvas, t, ctrl.duration, dpr);
+      drawWaveform(peaks, waveformCanvas, t, config.duration, dpr);
     }
     requestAnimationFrame(updateUI);
   }
@@ -256,7 +271,7 @@ async function init() {
 
   // Play/Pause
   function togglePlayPause() {
-    if (ctrl.isPlaying()) syncPause(); else syncPlay();
+    if (!audio.paused) syncPause(); else syncPlay();
   }
   playPauseBtn.addEventListener('click', togglePlayPause);
   canvas.addEventListener('click', togglePlayPause);
@@ -293,7 +308,7 @@ async function init() {
     const rect = waveformCanvas.getBoundingClientRect();
     const x = Math.max(0, Math.min(e.clientX - rect.left, rect.width));
     const t = xToTime(x * dpr, waveformCanvas.width);
-    syncSeek(Math.max(0, Math.min(t, ctrl.duration)));
+    syncSeek(Math.max(0, Math.min(t, audioDuration)));
   }
 
   function cueDragFromMouse(e: MouseEvent) {
@@ -302,7 +317,7 @@ async function init() {
     const dx = e.clientX - cueDragLastX;
     const dtPerPx = (viewEnd - viewStart) / rect.width;
     const dt = dx * dtPerPx;
-    const newT = Math.max(0, Math.min(getCue(cueDragging) + dt, ctrl.duration));
+    const newT = Math.max(0, Math.min(getCue(cueDragging) + dt, audioDuration));
     setCue(cueDragging, newT);
     rebuildTimelineInPlace();
     cueDragLastX = e.clientX;

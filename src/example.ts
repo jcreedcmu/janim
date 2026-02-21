@@ -103,7 +103,7 @@ export const VIEWPORT_3D: Viewport = computeFixedViewport3D(
 export const config: AnimationConfig = {
   width: 1920,
   height: 1080,
-  duration: 70,
+  duration: getCue('anim-end') - getCue('anim-begin'),
   fps: 30,
 };
 
@@ -212,6 +212,7 @@ export function buildTimeline(): SceneEntry[] {
 export let TIMELINE: SceneEntry[] = buildTimeline();
 
 export function rebuildTimelineInPlace(): void {
+  config.duration = getCue('anim-end') - getCue('anim-begin');
   TIMELINE = buildTimeline();
 }
 

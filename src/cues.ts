@@ -1,6 +1,7 @@
 export type CueDef = { id: string; defaultTime: number; label: string };
 
 export const CUE_DEFS: CueDef[] = [
+  { id: 'anim-begin', defaultTime: 0, label: 'BEGIN' },
   { id: 'scene-title', defaultTime: 0, label: 'Title' },
   { id: 'scene-rings', defaultTime: 3, label: 'Rings' },
   { id: 'rings-labels', defaultTime: 3.5, label: 'Labels' },
@@ -17,6 +18,7 @@ export const CUE_DEFS: CueDef[] = [
   { id: 'duality-row2', defaultTime: 55, label: 'Row2' },
   { id: 'duality-row3', defaultTime: 63, label: 'Row3' },
   { id: 'duality-fadeOut', defaultTime: 67, label: 'Closing' },
+  { id: 'anim-end', defaultTime: 70, label: 'END' },
 ];
 
 const STORAGE_KEY = 'janim-cues';

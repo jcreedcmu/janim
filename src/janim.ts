@@ -249,7 +249,7 @@ export interface AnimationController {
   isPlaying(): boolean;
   currentTime(): number;
   updateAnimation(fn: AnimationFn): void;
-  readonly duration: number;
+  readonly duration: number; // dynamic, reads from config
 }
 
 export function runInBrowser(
@@ -258,7 +258,8 @@ export function runInBrowser(
   animFn: AnimationFn,
 ): AnimationController {
   const ctx = canvas.getContext('2d')!;
-  const duration = config.duration;
+  // Read duration dynamically so it updates when config.duration changes
+  function duration() { return config.duration; }
   let currentAnimFn = animFn;
 
   let resW = config.width;
@@ -284,13 +285,13 @@ export function runInBrowser(
   async function frame(timestamp: number) {
     if (lastTimestamp !== null) {
       const dt = (timestamp - lastTimestamp) / 1000;
-      currentT = Math.min(currentT + dt, duration);
+      currentT = Math.min(currentT + dt, duration());
     }
     lastTimestamp = timestamp;
 
     await render();
 
-    if (currentT >= duration) {
+    if (currentT >= duration()) {
       playing = false;
     }
     if (playing) {
@@ -303,7 +304,7 @@ export function runInBrowser(
   return {
     play() {
       if (playing) return;
-      if (currentT >= duration) currentT = 0;
+      if (currentT >= duration()) currentT = 0;
       playing = true;
       lastTimestamp = null;
       rafId = requestAnimationFrame(frame);
@@ -314,7 +315,7 @@ export function runInBrowser(
       cancelAnimationFrame(rafId);
     },
     seek(t: number) {
-      currentT = Math.max(0, Math.min(t, duration));
+      currentT = Math.max(0, Math.min(t, duration()));
       lastTimestamp = null;
       render();
     },
@@ -331,7 +332,7 @@ export function runInBrowser(
     },
     isPlaying() { return playing; },
     currentTime() { return currentT; },
-    duration,
+    get duration() { return duration(); },
   };
 }
 
