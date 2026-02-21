@@ -36,18 +36,31 @@ function computePeaks(channelData: Float32Array, sampleRate: number, duration: n
   return { min: minArr, max: maxArr };
 }
 
+// Visible time window (in seconds)
+let viewStart = 0;
+let viewEnd = config.duration;
+
+function timeToX(t: number, w: number): number {
+  return ((t - viewStart) / (viewEnd - viewStart)) * w;
+}
+
+function xToTime(px: number, w: number): number {
+  return viewStart + (px / w) * (viewEnd - viewStart);
+}
+
 function drawWaveform(peaks: Peaks, cvs: HTMLCanvasElement, currentT: number, duration: number) {
   const ctx = cvs.getContext('2d')!;
   const w = cvs.width;
   const h = cvs.height;
   ctx.clearRect(0, 0, w, h);
 
-  const playheadX = (currentT / duration) * w;
+  const playheadX = timeToX(currentT, w);
   const buckets = peaks.min.length;
 
   // Draw one bar per pixel column, sampling from the fixed-size peaks array
   for (let px = 0; px < w; px++) {
-    const idx = Math.min(Math.round((px / w) * buckets), buckets - 1);
+    const t = xToTime(px, w);
+    const idx = Math.min(Math.max(0, Math.round((t / duration) * buckets)), buckets - 1);
     const minVal = Math.max(-1, peaks.min[idx] * 3);
     const maxVal = Math.min(1, peaks.max[idx] * 3);
     // Map [-1,1] to [h, 0]
@@ -58,12 +71,12 @@ function drawWaveform(peaks: Peaks, cvs: HTMLCanvasElement, currentT: number, du
   }
 
   // Scene boundary lines
-  const sceneBoundaries = TIMELINE.map(e => e.start);
   ctx.strokeStyle = 'rgba(255, 255, 255, 0.25)';
   ctx.lineWidth = 1;
-  for (const t of sceneBoundaries) {
-    if (t <= 0) continue;
-    const x = (t / duration) * w;
+  for (const entry of TIMELINE) {
+    if (entry.start <= 0) continue;
+    const x = timeToX(entry.start, w);
+    if (x < 0 || x > w) continue;
     ctx.beginPath();
     ctx.moveTo(x, 0);
     ctx.lineTo(x, h);
@@ -71,12 +84,14 @@ function drawWaveform(peaks: Peaks, cvs: HTMLCanvasElement, currentT: number, du
   }
 
   // Playhead line
-  ctx.strokeStyle = '#fff';
-  ctx.lineWidth = 2;
-  ctx.beginPath();
-  ctx.moveTo(playheadX, 0);
-  ctx.lineTo(playheadX, h);
-  ctx.stroke();
+  if (playheadX >= 0 && playheadX <= w) {
+    ctx.strokeStyle = '#fff';
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.moveTo(playheadX, 0);
+    ctx.lineTo(playheadX, h);
+    ctx.stroke();
+  }
 }
 
 // --- Sync helpers ---
@@ -159,29 +174,78 @@ async function init() {
   }, { passive: false });
 
   // Waveform mouse interaction
-  let dragging = false;
+  let seekDragging = false;
+  let panDragging = false;
+  let panLastX = 0;
 
   function seekFromMouse(e: MouseEvent) {
     const rect = waveformCanvas.getBoundingClientRect();
     const x = Math.max(0, Math.min(e.clientX - rect.left, rect.width));
-    const t = (x / rect.width) * ctrl.duration;
-    syncSeek(t);
+    const t = xToTime(x * dpr, waveformCanvas.width);
+    syncSeek(Math.max(0, Math.min(t, ctrl.duration)));
   }
 
   waveformCanvas.addEventListener('mousedown', (e) => {
-    dragging = true;
-    syncPause();
-    seekFromMouse(e);
+    if (e.button === 2) {
+      // Right-click: pan
+      panDragging = true;
+      panLastX = e.clientX;
+    } else if (e.button === 0) {
+      // Left-click: seek/scrub
+      seekDragging = true;
+      syncPause();
+      seekFromMouse(e);
+    }
+  });
+
+  waveformCanvas.addEventListener('contextmenu', (e) => {
+    e.preventDefault();
   });
 
   window.addEventListener('mousemove', (e) => {
-    if (!dragging) return;
-    seekFromMouse(e);
+    if (seekDragging) {
+      seekFromMouse(e);
+    } else if (panDragging) {
+      const rect = waveformCanvas.getBoundingClientRect();
+      const dx = e.clientX - panLastX;
+      const dtPerPx = (viewEnd - viewStart) / rect.width;
+      const dt = -dx * dtPerPx;
+      const span = viewEnd - viewStart;
+      let newStart = viewStart + dt;
+      let newEnd = viewEnd + dt;
+      // Clamp to [0, duration]
+      if (newStart < 0) { newStart = 0; newEnd = span; }
+      if (newEnd > ctrl.duration) { newEnd = ctrl.duration; newStart = newEnd - span; }
+      viewStart = newStart;
+      viewEnd = newEnd;
+      panLastX = e.clientX;
+    }
   });
 
   window.addEventListener('mouseup', () => {
-    dragging = false;
+    seekDragging = false;
+    panDragging = false;
   });
+
+  // Zoom waveform with scroll wheel (centered on mouse position)
+  waveformCanvas.addEventListener('wheel', (e) => {
+    e.preventDefault();
+    const rect = waveformCanvas.getBoundingClientRect();
+    const mouseX = e.clientX - rect.left;
+    const mouseT = xToTime(mouseX * dpr, waveformCanvas.width);
+    const factor = e.deltaY > 0 ? 1.2 : 1 / 1.2;
+    const newSpan = Math.min(Math.max((viewEnd - viewStart) * factor, 0.5), ctrl.duration);
+    // Keep mouseT at the same pixel position
+    const frac = mouseX / rect.width;
+    let newStart = mouseT - frac * newSpan;
+    let newEnd = mouseT + (1 - frac) * newSpan;
+    // Clamp
+    if (newStart < 0) { newEnd -= newStart; newStart = 0; }
+    if (newEnd > ctrl.duration) { newStart -= (newEnd - ctrl.duration); newEnd = ctrl.duration; }
+    newStart = Math.max(0, newStart);
+    viewStart = newStart;
+    viewEnd = newEnd;
+  }, { passive: false });
 }
 
 init().catch((err) => {
