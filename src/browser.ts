@@ -1,6 +1,7 @@
 /// <reference types="vite/client" />
 import { runInBrowser, AnimationController } from './janim.js';
-import { config, setup, animate, TIMELINE } from './example.js';
+import { config, setup, animate, rebuildTimelineInPlace } from './example.js';
+import { CUE_DEFS, getCue, setCue } from './cues.js';
 
 const canvas = document.getElementById('canvas') as HTMLCanvasElement;
 const playPauseBtn = document.getElementById('play-pause') as HTMLButtonElement;
@@ -48,10 +49,75 @@ function xToTime(px: number, w: number): number {
   return viewStart + (px / w) * (viewEnd - viewStart);
 }
 
-function drawWaveform(peaks: Peaks, cvs: HTMLCanvasElement, currentT: number, duration: number) {
+// --- Cue marker rendering ---
+const BUBBLE_FONT_SIZE = 9;
+const BUBBLE_H = 25;
+const BUBBLE_PAD = 8;
+const BUBBLE_R = 8;
+const SCENE_CUE_COLOR = 'rgba(255, 220, 100, 0.7)';
+const SUB_CUE_COLOR = 'rgba(140, 200, 255, 0.7)';
+const CUE_LINE_COLOR_SCENE = 'rgba(255, 220, 100, 0.35)';
+const CUE_LINE_COLOR_SUB = 'rgba(140, 200, 255, 0.25)';
+
+function isSceneCue(id: string): boolean {
+  return id.startsWith('scene-');
+}
+
+const BUBBLE_ANGLE = -Math.PI / 4; // -45 degrees (up and to the right)
+const BUBBLE_TOP_MARGIN = 90; // CSS pixels reserved above waveform for angled labels
+
+function drawCueMarkers(ctx: CanvasRenderingContext2D, w: number, h: number, topMargin: number, dpr: number) {
+  ctx.font = `${BUBBLE_FONT_SIZE * dpr}px system-ui, sans-serif`;
+  const bubbleH = BUBBLE_H * dpr;
+  const bubblePad = BUBBLE_PAD * dpr;
+  const bubbleR = BUBBLE_R * dpr;
+
+  for (const cue of CUE_DEFS) {
+    const t = getCue(cue.id);
+    const x = timeToX(t, w);
+    if (x < -100 * dpr || x > w + 100 * dpr) continue;
+
+    const scene = isSceneCue(cue.id);
+
+    // Vertical line from top margin to bottom
+    ctx.strokeStyle = scene ? CUE_LINE_COLOR_SCENE : CUE_LINE_COLOR_SUB;
+    ctx.lineWidth = 2 * dpr;
+    ctx.beginPath();
+    ctx.moveTo(x, topMargin);
+    ctx.lineTo(x, h);
+    ctx.stroke();
+
+    // Rotated bubble: pivot at (x, topMargin), rotated up-right
+    ctx.save();
+    ctx.translate(x, topMargin);
+    ctx.rotate(BUBBLE_ANGLE);
+
+    const textW = ctx.measureText(cue.label).width;
+    const bw = textW + bubblePad * 2;
+
+    const bx = 0;
+    const by = -bubbleH - bubblePad;
+
+    ctx.fillStyle = scene ? SCENE_CUE_COLOR : SUB_CUE_COLOR;
+    ctx.beginPath();
+    ctx.roundRect(bx, by, bw, bubbleH, bubbleR);
+    ctx.fill();
+
+    ctx.fillStyle = '#000';
+    ctx.textAlign = 'left';
+    ctx.textBaseline = 'middle';
+    ctx.fillText(cue.label, bx + bubblePad, by + bubbleH / 2);
+
+    ctx.restore();
+  }
+}
+
+function drawWaveform(peaks: Peaks, cvs: HTMLCanvasElement, currentT: number, duration: number, dpr: number) {
   const ctx = cvs.getContext('2d')!;
   const w = cvs.width;
   const h = cvs.height;
+  const topMargin = BUBBLE_TOP_MARGIN * dpr;
+  const waveH = h - topMargin; // height available for the waveform
   ctx.clearRect(0, 0, w, h);
 
   const playheadX = timeToX(currentT, w);
@@ -63,35 +129,64 @@ function drawWaveform(peaks: Peaks, cvs: HTMLCanvasElement, currentT: number, du
     const idx = Math.min(Math.max(0, Math.round((t / duration) * buckets)), buckets - 1);
     const minVal = Math.max(-1, peaks.min[idx] * 3);
     const maxVal = Math.min(1, peaks.max[idx] * 3);
-    // Map [-1,1] to [h, 0]
-    const yMin = ((1 - maxVal) / 2) * h;
-    const yMax = ((1 - minVal) / 2) * h;
+    // Map [-1,1] within the waveform region
+    const yMin = topMargin + ((1 - maxVal) / 2) * waveH;
+    const yMax = topMargin + ((1 - minVal) / 2) * waveH;
     ctx.fillStyle = px < playheadX ? '#e94560' : '#555';
     ctx.fillRect(px, yMin, 1, yMax - yMin);
   }
 
-  // Scene boundary lines
-  ctx.strokeStyle = 'rgba(255, 255, 255, 0.25)';
-  ctx.lineWidth = 1;
-  for (const entry of TIMELINE) {
-    if (entry.start <= 0) continue;
-    const x = timeToX(entry.start, w);
-    if (x < 0 || x > w) continue;
-    ctx.beginPath();
-    ctx.moveTo(x, 0);
-    ctx.lineTo(x, h);
-    ctx.stroke();
-  }
+  // Cue markers
+  drawCueMarkers(ctx, w, h, topMargin, dpr);
 
   // Playhead line
   if (playheadX >= 0 && playheadX <= w) {
     ctx.strokeStyle = '#fff';
-    ctx.lineWidth = 2;
+    ctx.lineWidth = 2 * dpr;
     ctx.beginPath();
-    ctx.moveTo(playheadX, 0);
+    ctx.moveTo(playheadX, topMargin);
     ctx.lineTo(playheadX, h);
     ctx.stroke();
   }
+}
+
+// --- Cue hit testing ---
+function hitTestCue(clientX: number, clientY: number, dpr: number): string | null {
+  const rect = waveformCanvas.getBoundingClientRect();
+  const mx = (clientX - rect.left) * dpr;
+  const my = (clientY - rect.top) * dpr;
+  const w = waveformCanvas.width;
+  const topMargin = BUBBLE_TOP_MARGIN * dpr;
+  const bubbleH = BUBBLE_H * dpr;
+  const bubblePad = BUBBLE_PAD * dpr;
+
+  const ctx = waveformCanvas.getContext('2d')!;
+  ctx.font = `${BUBBLE_FONT_SIZE * dpr}px system-ui, sans-serif`;
+
+  // Inverse-rotate mouse coords around each cue's pivot (x, topMargin)
+  const cosA = Math.cos(-BUBBLE_ANGLE);
+  const sinA = Math.sin(-BUBBLE_ANGLE);
+
+  for (const cue of CUE_DEFS) {
+    const t = getCue(cue.id);
+    const cx = timeToX(t, w);
+
+    // Transform mouse into the rotated bubble's local space
+    const dx = mx - cx;
+    const dy = my - topMargin;
+    const lx = dx * cosA - dy * sinA;
+    const ly = dx * sinA + dy * cosA;
+
+    const textW = ctx.measureText(cue.label).width;
+    const bw = textW + bubblePad * 2;
+    const bx = 0;
+    const by = -bubbleH - bubblePad;
+
+    if (lx >= bx && lx <= bx + bw && ly >= by && ly <= by + bubbleH) {
+      return cue.id;
+    }
+  }
+  return null;
 }
 
 // --- Sync helpers ---
@@ -113,6 +208,7 @@ function syncSeek(t: number) {
 // --- Init ---
 async function init() {
   await setup();
+
   ctrl = runInBrowser(canvas, config, animate);
 
   // Size waveform canvas for device pixel ratio
@@ -147,7 +243,7 @@ async function init() {
     timeDisplay.textContent = `${t.toFixed(2)}s / ${ctrl.duration.toFixed(1)}s`;
     playPauseBtn.textContent = ctrl.isPlaying() ? '\u23F8\uFE0E' : '\u25B6\uFE0E';
     if (peaks) {
-      drawWaveform(peaks, waveformCanvas, t, ctrl.duration);
+      drawWaveform(peaks, waveformCanvas, t, ctrl.duration, dpr);
     }
     requestAnimationFrame(updateUI);
   }
@@ -177,6 +273,7 @@ async function init() {
   let seekDragging = false;
   let panDragging = false;
   let panLastX = 0;
+  let cueDragging: string | null = null;
 
   function seekFromMouse(e: MouseEvent) {
     const rect = waveformCanvas.getBoundingClientRect();
@@ -185,16 +282,32 @@ async function init() {
     syncSeek(Math.max(0, Math.min(t, ctrl.duration)));
   }
 
+  function cueDragFromMouse(e: MouseEvent) {
+    if (!cueDragging) return;
+    const rect = waveformCanvas.getBoundingClientRect();
+    const x = Math.max(0, Math.min(e.clientX - rect.left, rect.width));
+    const t = Math.max(0, Math.min(xToTime(x * dpr, waveformCanvas.width), ctrl.duration));
+    setCue(cueDragging, t);
+    rebuildTimelineInPlace();
+  }
+
   waveformCanvas.addEventListener('mousedown', (e) => {
     if (e.button === 2) {
       // Right-click: pan
       panDragging = true;
       panLastX = e.clientX;
     } else if (e.button === 0) {
-      // Left-click: seek/scrub
-      seekDragging = true;
-      syncPause();
-      seekFromMouse(e);
+      // Check if clicking on a cue bubble
+      const hitCue = hitTestCue(e.clientX, e.clientY, dpr);
+      if (hitCue) {
+        cueDragging = hitCue;
+        syncPause();
+      } else {
+        // Left-click: seek/scrub
+        seekDragging = true;
+        syncPause();
+        seekFromMouse(e);
+      }
     }
   });
 
@@ -203,7 +316,9 @@ async function init() {
   });
 
   window.addEventListener('mousemove', (e) => {
-    if (seekDragging) {
+    if (cueDragging) {
+      cueDragFromMouse(e);
+    } else if (seekDragging) {
       seekFromMouse(e);
     } else if (panDragging) {
       const rect = waveformCanvas.getBoundingClientRect();
@@ -223,6 +338,7 @@ async function init() {
   });
 
   window.addEventListener('mouseup', () => {
+    cueDragging = null;
     seekDragging = false;
     panDragging = false;
   });
@@ -259,6 +375,7 @@ if (import.meta.hot) {
     const wasPlaying = ctrl.isPlaying();
     if (wasPlaying) syncPause();
     await mod.setup();
+    mod.rebuildTimelineInPlace();
     ctrl.updateAnimation(mod.animate);
     syncSeek(savedT);
     if (wasPlaying) syncPlay();

@@ -398,13 +398,13 @@ function drawBezierArrow(
   ctx.fill();
 }
 
-export function dualityScene(): SceneDraw {
+export function dualityScene(cues: { row2: number; row3: number; fadeOut: number }): SceneDraw {
   return async (ctx, localT, { width, height, duration }) => {
     const sectionOut = 1 - easeInOut(timeSlice(localT, duration - FADE, duration));
     const rowScale = 2.8;
     const rowGap = 100;
-    const rowAppear = [0, 5, 13]; // when each table row fades in
-    const tableFadeOut = 17; // when the whole table fades out
+    const rowAppear = [0, cues.row2, cues.row3];
+    const tableFadeOut = cues.fadeOut;
 
     const tableOut = 1 - easeInOut(timeSlice(localT, tableFadeOut - 0.3, tableFadeOut));
 
