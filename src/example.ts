@@ -1,88 +1,118 @@
-import { AnimationConfig, AnimationFn, TexRenderer, palette, lerp, easeInOut, timeSlice } from './janim.js';
+import { AnimationConfig, AnimationFn, TexRenderer, lerp, easeInOut, timeSlice } from './janim.js';
 
-const TEX_EMC2 = 'E = mc^2';
-const TEX_INTEGRAL = '\\int_0^\\infty e^{-x}\\, dx = 1';
+const TITLE = 'Seeing Upside-Down';
+const SUBTITLE = 'a brief taste of algebraic geometry';
+const TEX_Z = '\\mathbb{Z}';
+const TEX_ZN = '\\mathbb{Z}/n\\mathbb{Z}';
+const TEX_Q = '\\mathbb{Q}';
+const TEX_R = '\\mathbb{R}';
+const TEX_C = '\\mathbb{C}';
+const TEX_RXY = '\\mathbb{R}[x,y]';
+
+const RINGS = [TEX_Z, TEX_ZN, TEX_Q, TEX_R, TEX_C];
+const FADE = 0.15; // seconds — very brief fades
 
 export const config: AnimationConfig = {
   width: 1920,
   height: 1080,
-  duration: 5,
+  duration: 18,
   fps: 30,
 };
 
 export const tex = new TexRenderer();
 
 export async function setup(): Promise<void> {
-  await tex.prepare([TEX_EMC2, TEX_INTEGRAL]);
+  await tex.prepare([...RINGS, TEX_RXY]);
+}
+
+// Helper: draw TeX centered at (cx, cy)
+async function drawTexCentered(
+  ctx: CanvasRenderingContext2D, expr: string, cx: number, cy: number, scale: number,
+) {
+  const size = tex.measure(expr);
+  const w = size.width * scale;
+  const h = size.height * scale;
+  await tex.draw(ctx, expr, cx - w / 2, cy - h / 2, scale);
 }
 
 export const animate: AnimationFn = async (ctx, t) => {
   const { width, height } = config;
 
+  // Background
   ctx.fillStyle = '#faf5e7';
   ctx.fillRect(0, 0, width, height);
 
-  // --- Color blobs ---
-  const cols = 4;
-  const rows = 3;
-  const blobR = 40;
-  const spacingX = width / (cols + 1);
-  const spacingY = height / (rows + 1);
-  for (let i = 0; i < palette.length; i++) {
-    const col = i % cols;
-    const row = Math.floor(i / cols);
-    const cx = spacingX * (col + 1);
-    const cy = spacingY * (row + 1);
-    ctx.fillStyle = palette[i];
-    ctx.beginPath();
-    ctx.arc(cx, cy, blobR, 0, Math.PI * 2);
-    ctx.fill();
+  // --- Title card (0–4s) ---
+  if (t < 4) {
+    const fadeIn = easeInOut(timeSlice(t, 0, FADE));
+    const fadeOut = 1 - easeInOut(timeSlice(t, 4 - FADE, 4));
+    const alpha = Math.min(fadeIn, fadeOut);
+    if (alpha > 0) {
+      ctx.globalAlpha = alpha;
+      ctx.fillStyle = '#000';
+      ctx.font = 'bold 72px Roboto, sans-serif';
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.fillText(TITLE, width / 2, height / 2 - 40);
+      ctx.font = 'italic 48px Roboto, sans-serif';
+      ctx.fillText(SUBTITLE, width / 2, height / 2 + 40);
+      ctx.globalAlpha = 1;
+    }
+    return;
   }
 
-  // --- Phase 1: Fade in E = mc^2 (0–1s) ---
-  const p1 = easeInOut(timeSlice(t, 0, 1));
-  if (p1 > 0) {
-    ctx.globalAlpha = p1;
-    const scale = lerp(1.5, 3, p1);
-    const size = tex.measure(TEX_EMC2);
-    const w = size.width * scale;
-    const h = size.height * scale;
-    await tex.draw(ctx, TEX_EMC2, (width - w) / 2, (height - h) / 2 - 60, scale);
-    ctx.globalAlpha = 1;
+  // --- Ring examples (4–12s) ---
+  if (t < 12) {
+    const scale = 4;
+    const gap = 60;
+
+    const measures = RINGS.map(r => tex.measure(r));
+    const widths = measures.map(m => m.width * scale);
+    const totalW = widths.reduce((a, b) => a + b, 0) + gap * (RINGS.length - 1);
+    let x = (width - totalW) / 2;
+    const baselineY = height / 2; // common baseline
+
+    for (let i = 0; i < RINGS.length; i++) {
+      const appearTime = 5 + i * 1.2;
+      const p = easeInOut(timeSlice(t, appearTime, appearTime + FADE));
+      if (p > 0) {
+        ctx.globalAlpha = p;
+        const y = baselineY - measures[i].baseline * scale;
+        await tex.draw(ctx, RINGS[i], x, y, scale);
+        ctx.globalAlpha = 1;
+      }
+      x += widths[i] + gap;
+    }
+
+    return;
   }
 
-  // --- Phase 2: Bezier curve growing (1–3s) ---
-  const p2 = easeInOut(timeSlice(t, 1, 3));
-  if (p2 > 0) {
-    ctx.strokeStyle = '#e94560';
-    ctx.lineWidth = 3;
-    ctx.lineCap = 'round';
-    ctx.beginPath();
-    ctx.moveTo(80, height - 100);
+  // --- R[x,y] (12–18s) ---
+  {
+    const ringFade = 1 - easeInOut(timeSlice(t, 12, 12 + FADE));
+    if (ringFade > 0) {
+      const scale = 4;
+      const gap = 60;
+      const measures = RINGS.map(r => tex.measure(r));
+      const widths = measures.map(m => m.width * scale);
+      const totalW = widths.reduce((a, b) => a + b, 0) + gap * (RINGS.length - 1);
+      let x = (width - totalW) / 2;
+      const baselineY = height / 2;
 
-    // Draw a partial bezier — use subpath via splitting parameter
-    const endX = lerp(80, width - 80, p2);
-    const cp1x = lerp(80, 300, p2);
-    const cp1y = 100;
-    const cp2x = lerp(80, width - 300, p2);
-    const cp2y = height - 50;
+      ctx.globalAlpha = ringFade;
+      for (let i = 0; i < RINGS.length; i++) {
+        const y = baselineY - measures[i].baseline * scale;
+        await tex.draw(ctx, RINGS[i], x, y, scale);
+        x += widths[i] + gap;
+      }
+      ctx.globalAlpha = 1;
+    }
 
-    ctx.bezierCurveTo(cp1x, cp1y, cp2x, cp2y, endX, height - 100);
-    ctx.stroke();
-  }
-
-  // --- Phase 3: Slide in integral formula (3–4.5s) ---
-  const p3 = easeInOut(timeSlice(t, 3, 4.5));
-  if (p3 > 0) {
-    ctx.globalAlpha = p3;
-    const scale = 2.5;
-    const size = tex.measure(TEX_INTEGRAL);
-    const w = size.width * scale;
-    const h = size.height * scale;
-    const targetX = (width - w) / 2;
-    const startX = width + 20;
-    const x = lerp(startX, targetX, p3);
-    await tex.draw(ctx, TEX_INTEGRAL, x, (height - h) / 2 + 80, scale);
-    ctx.globalAlpha = 1;
+    const rxyFade = easeInOut(timeSlice(t, 13, 13 + FADE));
+    if (rxyFade > 0) {
+      ctx.globalAlpha = rxyFade;
+      await drawTexCentered(ctx, TEX_RXY, width / 2, height / 2, 5);
+      ctx.globalAlpha = 1;
+    }
   }
 };

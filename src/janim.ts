@@ -43,6 +43,8 @@ interface TexCacheEntry {
   svgTemplate: string;
   width: number;
   height: number;
+  // Distance from top of bounding box to baseline, in logical px
+  baseline: number;
   // Browser: pre-loaded Image (browser re-rasterizes SVG at draw size)
   browserImage?: ImageLike;
   // Node: loadImage function, cached at import time
@@ -61,7 +63,7 @@ export class TexRenderer {
     this.html = mathjax.document('', { InputJax: tex, OutputJax: svg });
   }
 
-  private texToSvg(expression: string): { svgTemplate: string; width: number; height: number } {
+  private texToSvg(expression: string): { svgTemplate: string; width: number; height: number; baseline: number } {
     const node = this.html.convert(expression, { display: true });
     // innerHTML strips the <mjx-container> wrapper, giving us just the <svg>
     let svgString = this.adaptor.innerHTML(node);
@@ -75,11 +77,16 @@ export class TexRenderer {
     const width = widthMatch ? parseDimension(widthMatch[1]) : 100;
     const height = heightMatch ? parseDimension(heightMatch[1]) : 50;
 
-    // Pad the viewBox so antialiased pixels at glyph edges don't get clipped.
-    const VIEWBOX_PAD = 50; // in SVG coordinate units
+    // Compute baseline from viewBox: minY is the negative ascent,
+    // so baseline is at (-minY / vbH) * height in logical pixels.
     const vbMatch = svgString.match(/viewBox="([^"]+)"/);
+    let baseline = height * 0.8; // fallback
     if (vbMatch) {
       const [minX, minY, vbW, vbH] = vbMatch[1].split(' ').map(Number);
+      baseline = (-minY / vbH) * height;
+
+      // Pad the viewBox so antialiased pixels at glyph edges don't get clipped.
+      const VIEWBOX_PAD = 50;
       const padded = `${minX - VIEWBOX_PAD} ${minY - VIEWBOX_PAD} ${vbW + 2 * VIEWBOX_PAD} ${vbH + 2 * VIEWBOX_PAD}`;
       svgString = svgString.replace(`viewBox="${vbMatch[1]}"`, `viewBox="${padded}"`);
     }
@@ -89,7 +96,7 @@ export class TexRenderer {
     if (widthMatch) svgString = svgString.replace(`width="${widthMatch[1]}"`, `width="%WIDTH%"`);
     if (heightMatch) svgString = svgString.replace(`height="${heightMatch[1]}"`, `height="%HEIGHT%"`);
 
-    return { svgTemplate: svgString, width, height };
+    return { svgTemplate: svgString, width, height, baseline };
   }
 
   async prepare(expressions: string[]): Promise<void> {
@@ -98,8 +105,8 @@ export class TexRenderer {
     for (const expr of expressions) {
       if (this.cache.has(expr)) continue;
 
-      const { svgTemplate, width, height } = this.texToSvg(expr);
-      const entry: TexCacheEntry = { svgTemplate, width, height };
+      const { svgTemplate, width, height, baseline } = this.texToSvg(expr);
+      const entry: TexCacheEntry = { svgTemplate, width, height, baseline };
 
       if (isNode) {
         const { loadImage } = await import('@napi-rs/canvas');
@@ -153,10 +160,10 @@ export class TexRenderer {
     }
   }
 
-  measure(tex: string): { width: number; height: number } {
+  measure(tex: string): { width: number; height: number; baseline: number } {
     const entry = this.cache.get(tex);
     if (!entry) throw new Error(`TeX not prepared: "${tex}". Call prepare() first.`);
-    return { width: entry.width, height: entry.height };
+    return { width: entry.width, height: entry.height, baseline: entry.baseline };
   }
 }
 
