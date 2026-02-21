@@ -27,6 +27,9 @@ type ImageLike = HTMLImageElement | { width: number; height: number };
 // 1 ex ≈ 8px at default MathJax font size — tunable
 const EX_TO_PX = 8;
 
+// Rasterize SVGs at this multiple of logical size so they stay sharp when scaled up
+const SVG_RASTER_SCALE = 16;
+
 function parseDimension(value: string): number {
   const n = parseFloat(value);
   if (value.endsWith('ex')) return n * EX_TO_PX;
@@ -54,11 +57,20 @@ export class TexRenderer {
     // Replace currentColor with white so it renders visibly in an <img> context
     svgString = svgString.replace(/currentColor/g, '#ffffff');
 
-    // Extract dimensions from the SVG root element
+    // Extract dimensions and convert ex → px in the SVG attributes so that
+    // renderers that don't understand ex units (e.g. resvg in @napi-rs/canvas)
+    // still produce correctly-sized images.
     const widthMatch = svgString.match(/width="([^"]+)"/);
     const heightMatch = svgString.match(/height="([^"]+)"/);
     const width = widthMatch ? parseDimension(widthMatch[1]) : 100;
     const height = heightMatch ? parseDimension(heightMatch[1]) : 50;
+
+    // Rasterize at a high resolution so scaling up in drawImage stays sharp.
+    // The viewBox preserves the vector coordinates; we just inflate width/height.
+    const rasterWidth = width * SVG_RASTER_SCALE;
+    const rasterHeight = height * SVG_RASTER_SCALE;
+    if (widthMatch) svgString = svgString.replace(`width="${widthMatch[1]}"`, `width="${rasterWidth}px"`);
+    if (heightMatch) svgString = svgString.replace(`height="${heightMatch[1]}"`, `height="${rasterHeight}px"`);
 
     return { svgString, width, height };
   }
