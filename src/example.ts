@@ -91,7 +91,7 @@ const P = '{\\color{#00b2bb}{p}}';
 export const N_COLOR = '#b100d1';
 export const P_COLOR = '#00b2bb';
 const DUALITY_GENERAL = `\\mathbb{R}[${X}_1,\\ldots,${X}_{\\cssId{n1}{${N}}}] \\to \\mathbb{R}[${T}_1,\\ldots,${T}_{\\cssId{p1}{${P}}}] \\quad\\cssId{arr}{\\longleftrightarrow}\\quad \\text{polynomial maps } \\mathbb{R}^{\\cssId{p2}{${P}}} \\to \\mathbb{R}^{\\cssId{n2}{${N}}}`;
-const DUALITY_CLOSING_EXPR = `\\text{algebra} \\quad\\longleftrightarrow\\quad \\text{geometry}`;
+const DUALITY_CLOSING_EXPR = `\\text{algebra}^{\\text{op}} \\quad\\longleftrightarrow\\quad \\text{geometry}`;
 export const DUALITY_ROWS = [DUALITY_2D, DUALITY_3D, DUALITY_GENERAL];
 export const DUALITY_CLOSING = DUALITY_CLOSING_EXPR;
 
@@ -138,7 +138,7 @@ const TIMELINE: SceneEntry[] = [
     draw: ringsScene({ labels: 0.5, polys: 3 }),
     captions: [
       { start: 0, end: 2, text: "Let's talk about real polynomial rings." },
-      { start: 2, end: 4.5, text: "The elements of one of these rings\nare all the polynomials we can write down" },
+      { start: 2, end: 4.5, text: "The elements of a polynomial ring\nare all the polynomials we can write down" },
       { start: 4.5, end: 7, text: "over a particular set of variables,\nwith real coefficients." },
     ],
   },
@@ -149,19 +149,21 @@ const TIMELINE: SceneEntry[] = [
       { start: 0, end: 2.5, text: "What are the nice functions\nbetween these rings?" },
       { start: 2.5, end: 4, text: "Let's consider an example." },
       { start: 4, end: 6.5, text: "What are some nice functions\nfrom R[x,y] to R[t]?" },
-      { start: 6.5, end: 9, text: "Let's say that we want to only\nmap constants to themselves." },
-      { start: 9, end: 12, text: "If we demand that f is a ring homomorphism,\nthen the only freedom we have left" },
-      { start: 12, end: 15, text: "is deciding what x and y\nget mapped to." },
-      { start: 15, end: 18, text: "A nice function from R[x,y] to R[t]\namounts to making only two choices:" },
-      { start: 18, end: 20, text: "choosing a polynomial in t for x,\nand another for y." },
+      { start: 6.5, end: 9, text: "I'm being intentionally a bit vague\nabout what \"nice\" means." },
+      { start: 9, end: 11.5, text: "Let's say that being a nice function means\nat least that you map any constant to itself." },
+      { start: 11.5, end: 14, text: "Let's also say that a nice function\nneeds to be a ring homomorphism:" },
+      { start: 14, end: 15.5, text: "it respects all the ring operations." },
+      { start: 15.5, end: 17.5, text: "In that case the only freedom we have left\nis deciding what x and y get mapped to," },
+      { start: 17.5, end: 19, text: "because once we decide that, everything else\nfollows from ring operation preservation." },
+      { start: 19, end: 20, text: "So a nice function from R[x,y] to R[t]\namounts to making only two choices:" },
     ],
   },
   {
     start: 30,
     draw: parametricScene({ plotStart: 0.5 }),
     captions: [
-      { start: 0, end: 3.5, text: "This is the same thing as\ndescribing a parameterized curve in the plane." },
-      { start: 3.5, end: 7, text: "We're giving for each time t a function\nthat tells us what the x and y values should be." },
+      { start: 0, end: 3.5, text: "Notice that this is the same thing as\ndescribing a parameterized curve in the plane." },
+      { start: 3.5, end: 7, text: "We're giving for each time t a polynomial function\nthat tells us what the x and y values should be at that time." },
     ],
   },
   {
@@ -176,11 +178,12 @@ const TIMELINE: SceneEntry[] = [
     start: 50,
     draw: dualityScene(),
     captions: [
-      { start: 0, end: 5, text: "So maps from R[x,y] to R[t] tell us\nhow to map a one-dimensional line into the two-dimensional plane," },
-      { start: 5, end: 8, text: "and maps from R[x,y,z] to R[t]\ntell us how to map a line into 3D space." },
-      { start: 8, end: 11, text: "We're tempted to conclude that a polynomial ring\nwith n variables has something to do with n-dimensional space," },
-      { start: 11, end: 13, text: "but the functions seem\nturned around backwards." },
-      { start: 13, end: 15, text: "This pattern does work out nicely in general." },
+      { start: 0, end: 3, text: "So maps from R[x,y] to R[t] tell us\nhow to map a one-dimensional line into the two-dimensional plane," },
+      { start: 3, end: 5, text: "and maps from R[x,y,z] to R[t]\ntell us how to map a line into 3D space." },
+      { start: 5, end: 8, text: "It's a nice exercise to change the number of variables\non both sides of the function and see what happens." },
+      { start: 8, end: 11, text: "For example, maps from R[x,y] to just R are\nmere points in the plane," },
+      { start: 11, end: 13, text: "and maps from R[x,y,z] to R[t,u] are\ntwo-dimensional polynomial surfaces in 3D space." },
+      { start: 13, end: 15, text: "There's a general pattern happening here:" },
       { start: 15, end: 17.5, text: "Algebraically nice maps from a ring with n variables\nto a ring with p variables correspond to" },
       { start: 17.5, end: 19, text: "geometrically nice maps going the other direction,\nfrom p-dimensional space to n-dimensional space." },
       { start: 19, end: 20, text: "This is a small tip of a deep iceberg:\nthe duality between algebra and geometry." },
