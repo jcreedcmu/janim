@@ -201,7 +201,7 @@ export function parametricScene(cues: { plotStart: number }): SceneDraw {
       const yPrefixM = tex.measure(TEX_Y_MAPSTO);
       const prefixW = Math.max(xPrefixM.width, yPrefixM.width) * mapScale;
 
-      const leftMargin = 60;
+      const leftMargin = 400;
       const leftX = leftMargin;
       const rhsX = leftX + prefixW + rhsGap;
 
@@ -278,7 +278,7 @@ export function parametric3DScene(cues: { plotStart: number }): SceneDraw {
       const zPrefixM = tex.measure(TEX_Z_MAPSTO);
       const prefixW = Math.max(xPrefixM.width, yPrefixM.width, zPrefixM.width) * mapScale;
 
-      const leftMargin = 60;
+      const leftMargin = 650;
       const leftX = leftMargin;
       const rhsX = leftX + prefixW + rhsGap;
 
