@@ -32,6 +32,22 @@ setup().then(() => {
     ctrl.seek(0);
   });
 
+  // Scroll wheel zoom
+  let zoom = 1;
+  canvas.style.width = `${config.width}px`;
+  canvas.style.height = `${config.height}px`;
+  canvas.addEventListener('wheel', (e) => {
+    e.preventDefault();
+    const factor = e.deltaY < 0 ? 1.1 : 1 / 1.1;
+    zoom = Math.max(0.25, Math.min(8, zoom * factor));
+    canvas.style.transform = `scale(${zoom})`;
+    canvas.style.transformOrigin = 'center center';
+    ctrl.setResolution(
+      Math.round(config.width * zoom),
+      Math.round(config.height * zoom),
+    );
+  }, { passive: false });
+
   let scrubbing = false;
   scrubber.addEventListener('mousedown', () => { scrubbing = true; ctrl.pause(); });
   scrubber.addEventListener('input', () => { ctrl.seek(parseFloat(scrubber.value)); });

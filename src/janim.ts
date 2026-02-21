@@ -168,6 +168,7 @@ export interface AnimationController {
   play(): void;
   pause(): void;
   seek(t: number): void;
+  setResolution(width: number, height: number): void;
   isPlaying(): boolean;
   currentTime(): number;
   readonly duration: number;
@@ -178,10 +179,13 @@ export function runInBrowser(
   config: AnimationConfig,
   animFn: AnimationFn,
 ): AnimationController {
-  canvas.width = config.width;
-  canvas.height = config.height;
   const ctx = canvas.getContext('2d')!;
   const duration = config.duration;
+
+  let resW = config.width;
+  let resH = config.height;
+  canvas.width = resW;
+  canvas.height = resH;
 
   let playing = true;
   let currentT = 0;
@@ -189,8 +193,13 @@ export function runInBrowser(
   let rafId = 0;
 
   async function render() {
+    const scaleX = resW / config.width;
+    const scaleY = resH / config.height;
+    ctx.save();
+    ctx.scale(scaleX, scaleY);
     ctx.clearRect(0, 0, config.width, config.height);
     await animFn(ctx, currentT);
+    ctx.restore();
   }
 
   async function frame(timestamp: number) {
@@ -229,6 +238,13 @@ export function runInBrowser(
       currentT = Math.max(0, Math.min(t, duration));
       lastTimestamp = null;
       render();
+    },
+    setResolution(width: number, height: number) {
+      resW = width;
+      resH = height;
+      canvas.width = resW;
+      canvas.height = resH;
+      if (!playing) render();
     },
     isPlaying() { return playing; },
     currentTime() { return currentT; },
