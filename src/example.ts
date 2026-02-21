@@ -37,8 +37,8 @@ const TEX_F100 = 'f(\\tfrac{100}{7}) = \\tfrac{100}{7}';
 export const CONST_EXPRS = [TEX_F0, TEX_F3, TEX_F100];
 
 // --- Mapping examples: persistent prefixes + cycling RHS ---
-export const TEX_X_MAPSTO = `${X} \\mapsto`;
-export const TEX_Y_MAPSTO = `${Y} \\mapsto`;
+export const TEX_X_MAPSTO = `f(${X}) =`;
+export const TEX_Y_MAPSTO = `f(${Y}) =`;
 
 export const MAPPING_RHS: [string, string][] = [
   [`${T}^3 + 1`, `${T}^2 - ${T}`],
@@ -60,7 +60,7 @@ export const VIEWPORT: Viewport = computeFixedViewport(CURVES);
 
 // --- 3D mapping data ---
 export const Z = '{\\color{#6eb200}{z}}';
-export const TEX_Z_MAPSTO = `${Z} \\mapsto`;
+export const TEX_Z_MAPSTO = `f(${Z}) =`;
 
 export const MAPPING_RHS_3D: [string, string, string][] = [
   [T, `${T}^2`, `${T}^3`],
