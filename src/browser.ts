@@ -36,20 +36,11 @@ async function init() {
   });
 
   let zoom = 1;
-  canvas.style.width = `${config.width}px`;
-  canvas.style.height = `${config.height}px`;
-  canvas.style.transform = '';
-  canvas.style.transformOrigin = '';
   canvas.addEventListener('wheel', (e) => {
     e.preventDefault();
     const factor = e.deltaY < 0 ? 1.1 : 1 / 1.1;
     zoom = Math.max(0.25, Math.min(8, zoom * factor));
     canvas.style.transform = `scale(${zoom})`;
-    canvas.style.transformOrigin = 'center center';
-    ctrl.setResolution(
-      Math.round(config.width * zoom),
-      Math.round(config.height * zoom),
-    );
   }, { passive: false });
 
   scrubber.addEventListener('mousedown', () => { ctrl.pause(); });
