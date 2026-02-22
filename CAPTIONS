@@ -1,0 +1,71 @@
+[!BEGIN]
+
+[!Title]
+
+[!Rings]
+Let's talk about real polynomial rings.
+
+[!Labels]
+The elements of a polynomial ring
+are all the polynomials we can write down
+
+[!Polys]
+over a particular set of variables,
+with real coefficients.
+
+[!Hom]
+
+[!TypeSig]
+What are the nice functions
+from R[x,y] to R[t]?
+
+[!Constants]
+A nice function maps constants to themselves
+and is a ring homomorphism.
+
+[!RingOps]
+It respects all the ring operations.
+
+[!Mappings]
+The only freedom left is deciding
+what x and y map to — two choices.
+
+[!Param2D]
+
+[!Plot2D]
+This is the same thing as describing
+a parameterized curve in the plane.
+
+[!Param3D]
+
+[!Plot3D]
+If we had three variables instead,
+we'd get parameterized curves in 3D space.
+
+[!Duality]
+Maps from R[x,y] to R[t] give curves in the plane,
+and maps from R[x,y,z] to R[t] give curves in 3D.
+
+[!Row2]
+Try changing the number of variables
+on both sides and see what happens.
+
+[!Row3]
+Maps from R[x,y] to just R
+are mere points in the plane.
+
+[!Row4]
+Maps from R[x,y,z] to R[t,u] are
+polynomial surfaces in 3D space.
+
+[!Row5]
+There's a general pattern happening here.
+
+[!Uniform]
+Nice maps from n variables to p variables
+correspond to geometric maps from R^p to R^n.
+
+[!Closing]
+The duality between algebra and geometry.
+
+[!END]

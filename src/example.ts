@@ -1,7 +1,8 @@
 import { AnimationConfig, AnimationFn, TexRenderer, easeInOut, timeSlice } from './janim.js';
 import { CurveDef, computeFixedViewport, Viewport, CurveDef3D, createProjection, computeFixedViewport3D } from './plot.js';
 import { SceneDraw, titleScene, ringsScene, homomorphismScene, parametricScene, parametric3DScene, dualityScene } from './scenes.js';
-import { getCue } from './cues.js';
+import { getCue, CUE_DEFS } from './cues.js';
+import captionsRaw from '../CAPTIONS?raw';
 
 export const TITLE = 'Seeing Upside-Down';
 export const SUBTITLE = 'a brief taste of algebraic geometry';
@@ -145,21 +146,63 @@ interface SceneEntry {
   captions?: { start: number; end: number; text: string }[];
 }
 
-// Helper: build caption array from cue-aligned slots.
-// Each entry is [cueId, text]. The caption starts at that cue and ends at the
-// next entry's cue (or endCue for the last entry). Null text = no caption.
+// ---------------------------------------------------------------------------
+// Caption parser — loads text from external CAPTIONS file
+// ---------------------------------------------------------------------------
+
+function parseCaptions(raw: string): Map<string, string | null> {
+  const labelToId = new Map(CUE_DEFS.map(c => [c.label, c.id]));
+  const map = new Map<string, string | null>();
+  const foundLabels = new Set<string>();
+
+  let currentLabel: string | null = null;
+  let textLines: string[] = [];
+
+  function flush() {
+    if (currentLabel !== null) {
+      foundLabels.add(currentLabel);
+      const id = labelToId.get(currentLabel);
+      if (id) {
+        const text = textLines.join('\n').trim();
+        map.set(id, text || null);
+      } else {
+        console.warn(`CAPTIONS: unknown marker [!${currentLabel}]`);
+      }
+    }
+  }
+
+  for (const line of raw.split('\n')) {
+    const m = line.match(/^\[!(\w+)\]\s*$/);
+    if (m) { flush(); currentLabel = m[1]; textLines = []; }
+    else { textLines.push(line); }
+  }
+  flush();
+
+  for (const cue of CUE_DEFS) {
+    if (!foundLabels.has(cue.label)) {
+      console.warn(`CAPTIONS: missing marker for cue [!${cue.label}] (${cue.id})`);
+    }
+  }
+
+  return map;
+}
+
+const captionMap = parseCaptions(captionsRaw);
+
+// Build caption array from cue-aligned slots. Each cue's text comes from the
+// parsed CAPTIONS file. Empty/missing text = no caption for that slot.
 function cc(
   sceneCue: string,
-  entries: [string, string | null][],
+  cueIds: string[],
   endCue: string,
 ): { start: number; end: number; text: string }[] {
   const s = getCue(sceneCue);
   const result: { start: number; end: number; text: string }[] = [];
-  for (let i = 0; i < entries.length; i++) {
-    const [cue, text] = entries[i];
-    if (text === null) continue;
-    const start = getCue(cue) - s;
-    const nextCue = i < entries.length - 1 ? entries[i + 1][0] : endCue;
+  for (let i = 0; i < cueIds.length; i++) {
+    const text = captionMap.get(cueIds[i]);
+    if (!text) continue;
+    const start = getCue(cueIds[i]) - s;
+    const nextCue = i < cueIds.length - 1 ? cueIds[i + 1] : endCue;
     const end = getCue(nextCue) - s;
     result.push({ start, end, text });
   }
@@ -178,11 +221,9 @@ export function buildTimeline(): SceneEntry[] {
         labels: getCue('rings-labels') - getCue('scene-rings'),
         polys: getCue('rings-polys') - getCue('scene-rings'),
       }),
-      captions: cc('scene-rings', [
-        ['scene-rings', "Let's talk about real polynomial rings."],
-        ['rings-labels', "The elements of a polynomial ring\nare all the polynomials we can write down"],
-        ['rings-polys', "over a particular set of variables,\nwith real coefficients."],
-      ], 'scene-hom'),
+      captions: cc('scene-rings',
+        ['scene-rings', 'rings-labels', 'rings-polys'],
+        'scene-hom'),
     },
     {
       start: getCue('scene-hom'),
@@ -192,33 +233,27 @@ export function buildTimeline(): SceneEntry[] {
         ringOps: getCue('hom-ringOps') - getCue('scene-hom'),
         mappings: getCue('hom-mappings') - getCue('scene-hom'),
       }),
-      captions: cc('scene-hom', [
-        ['scene-hom', null],
-        ['hom-typeSig', "What are the nice functions\nfrom R[x,y] to R[t]?"],
-        ['hom-constants', "A nice function maps constants to themselves\nand is a ring homomorphism."],
-        ['hom-ringOps', "It respects all the ring operations."],
-        ['hom-mappings', "The only freedom left is deciding\nwhat x and y map to — two choices."],
-      ], 'scene-param'),
+      captions: cc('scene-hom',
+        ['scene-hom', 'hom-typeSig', 'hom-constants', 'hom-ringOps', 'hom-mappings'],
+        'scene-param'),
     },
     {
       start: getCue('scene-param'),
       draw: parametricScene({
         plotStart: getCue('param-plotStart') - getCue('scene-param'),
       }),
-      captions: cc('scene-param', [
-        ['scene-param', null],
-        ['param-plotStart', "This is the same thing as describing\na parameterized curve in the plane."],
-      ], 'scene-param3d'),
+      captions: cc('scene-param',
+        ['scene-param', 'param-plotStart'],
+        'scene-param3d'),
     },
     {
       start: getCue('scene-param3d'),
       draw: parametric3DScene({
         plotStart: getCue('param3d-plotStart') - getCue('scene-param3d'),
       }),
-      captions: cc('scene-param3d', [
-        ['scene-param3d', null],
-        ['param3d-plotStart', "If we had three variables instead,\nwe'd get parameterized curves in 3D space."],
-      ], 'scene-duality'),
+      captions: cc('scene-param3d',
+        ['scene-param3d', 'param3d-plotStart'],
+        'scene-duality'),
     },
     {
       start: getCue('scene-duality'),
@@ -230,15 +265,9 @@ export function buildTimeline(): SceneEntry[] {
         uniformize: getCue('duality-uniformize') - getCue('scene-duality'),
         fadeOut: getCue('duality-fadeOut') - getCue('scene-duality'),
       }),
-      captions: cc('scene-duality', [
-        ['scene-duality', "Maps from R[x,y] to R[t] give curves in the plane,\nand maps from R[x,y,z] to R[t] give curves in 3D."],
-        ['duality-row2', "Try changing the number of variables\non both sides and see what happens."],
-        ['duality-row3', "Maps from R[x,y] to just R\nare mere points in the plane."],
-        ['duality-row4', "Maps from R[x,y,z] to R[t,u] are\npolynomial surfaces in 3D space."],
-        ['duality-row5', "There's a general pattern happening here."],
-        ['duality-uniformize', "Nice maps from n variables to p variables\ncorrespond to geometric maps from R^p to R^n."],
-        ['duality-fadeOut', "The duality between algebra and geometry."],
-      ], 'anim-end'),
+      captions: cc('scene-duality',
+        ['scene-duality', 'duality-row2', 'duality-row3', 'duality-row4', 'duality-row5', 'duality-uniformize', 'duality-fadeOut'],
+        'anim-end'),
     },
   ];
 }
