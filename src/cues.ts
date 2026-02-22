@@ -9,6 +9,7 @@ export const CUE_DEFS: CueDef[] = [
   { id: 'scene-hom', defaultTime: 10, label: 'Hom' },
   { id: 'hom-typeSig', defaultTime: 10.5, label: 'TypeSig' },
   { id: 'hom-constants', defaultTime: 17, label: 'Constants' },
+  { id: 'hom-ringOps', defaultTime: 18, label: 'RingOps' },
   { id: 'hom-mappings', defaultTime: 19.5, label: 'Mappings' },
   { id: 'scene-param', defaultTime: 30, label: 'Param2D' },
   { id: 'param-plotStart', defaultTime: 30.5, label: 'Plot2D' },

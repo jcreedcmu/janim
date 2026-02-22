@@ -49,6 +49,13 @@ export const MAPPING_RHS: [string, string][] = [
 ];
 export const ALL_RHS = MAPPING_RHS.flat();
 
+// --- Ring operation preservation examples ---
+export const RING_OP_EXPRS = [
+  `f(${X} + 2${Y}) = f(${X}) + 2f(${Y})`,
+  `f(${X}${Y}^2 - 3) = f(${X})\\,f(${Y})^2 - 3`,
+  `f(${X}^3) = f(${X})^3`,
+];
+
 // --- Parametric curve functions (parallel to MAPPING_RHS) ---
 export const CURVES: CurveDef[] = [
   { xFn: t => t ** 3 + 1, yFn: t => t ** 2 - t, tRange: [-1.5, 1.5] },
@@ -122,7 +129,7 @@ export async function setup(): Promise<void> {
   await tex.prepare([
     ...RING_LABELS, ...ALL_POLYS,
     TEX_F_TYPE, ...CONST_EXPRS,
-    TEX_X_MAPSTO, TEX_Y_MAPSTO, ...ALL_RHS, X, Y,
+    TEX_X_MAPSTO, TEX_Y_MAPSTO, ...ALL_RHS, ...RING_OP_EXPRS, X, Y,
     TEX_Z_MAPSTO, Z, ...ALL_RHS_3D,
     ...DUALITY_ROWS, ...DUALITY_ROWS_UNIFORM, DUALITY_CLOSING,
   ]);
@@ -161,6 +168,7 @@ export function buildTimeline(): SceneEntry[] {
       draw: homomorphismScene({
         typeSig: getCue('hom-typeSig') - getCue('scene-hom'),
         constants: getCue('hom-constants') - getCue('scene-hom'),
+        ringOps: getCue('hom-ringOps') - getCue('scene-hom'),
         mappings: getCue('hom-mappings') - getCue('scene-hom'),
       }),
       captions: [

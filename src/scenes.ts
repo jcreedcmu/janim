@@ -1,10 +1,10 @@
-import { easeInOut, timeSlice } from './janim.js';
+import { easeInOut, easeOutBack, lerp, timeSlice } from './janim.js';
 import { PlotRect, drawPlotAxes, drawParametricCurve, draw3DAxes, draw3DParametricCurve, createProjection } from './plot.js';
 import {
   tex, FADE, TITLE, SUBTITLE,
   RING_LABELS, POLY_GROUPS,
   TEX_F_TYPE, CONST_EXPRS,
-  TEX_X_MAPSTO, TEX_Y_MAPSTO, MAPPING_RHS, ALL_RHS,
+  TEX_X_MAPSTO, TEX_Y_MAPSTO, MAPPING_RHS, ALL_RHS, RING_OP_EXPRS,
   CURVES, VIEWPORT, X, Y,
   TEX_Z_MAPSTO, MAPPING_RHS_3D, Z,
   CURVES_3D, VIEWPORT_3D,
@@ -101,7 +101,7 @@ export function ringsScene(cues: { labels: number; polys: number }): SceneDraw {
   };
 }
 
-export function homomorphismScene(cues: { typeSig: number; constants: number; mappings: number }): SceneDraw {
+export function homomorphismScene(cues: { typeSig: number; constants: number; ringOps: number; mappings: number }): SceneDraw {
   return async (ctx, localT, { width, height, duration }) => {
     // Type signature: fades in at cues.typeSig, fades out at duration
     const fTypeIn = easeInOut(timeSlice(localT, cues.typeSig, cues.typeSig + FADE));
@@ -114,16 +114,37 @@ export function homomorphismScene(cues: { typeSig: number; constants: number; ma
     }
 
     // Constants: f(0)=0, f(-3)=-3, f(100/7)=100/7
+    // At ringOps cue, they slide left; ring-op examples appear on right
     if (localT >= cues.constants && localT < cues.mappings) {
       const constOut = 1 - easeInOut(timeSlice(localT, cues.mappings - 0.5, cues.mappings - 0.5 + FADE));
       const constTimes = [cues.constants + 0.2, cues.constants + 0.6, cues.constants + 1.0];
+
+      // Slide constants left at ringOps cue
+      const slideT = easeOutBack(timeSlice(localT, cues.ringOps, cues.ringOps + 0.5));
+      const constCenterX = lerp(width / 2, width * 0.3, slideT);
+
       for (let i = 0; i < CONST_EXPRS.length; i++) {
         const fadeIn = easeInOut(timeSlice(localT, constTimes[i], constTimes[i] + FADE));
         const alpha = fadeIn * constOut;
         if (alpha > 0) {
           ctx.globalAlpha = alpha;
-          await drawTexCentered(ctx, CONST_EXPRS[i], width / 2, height / 2 + i * 90, 3);
+          await drawTexCentered(ctx, CONST_EXPRS[i], constCenterX, height / 2 + i * 90, 3);
           ctx.globalAlpha = 1;
+        }
+      }
+
+      // Ring-op expressions on the right
+      if (localT >= cues.ringOps) {
+        const opsScale = 2.5;
+        for (let i = 0; i < RING_OP_EXPRS.length; i++) {
+          const opStart = cues.ringOps + 0.5 + i * 0.3;
+          const opFadeIn = easeInOut(timeSlice(localT, opStart, opStart + FADE));
+          const alpha = opFadeIn * constOut;
+          if (alpha > 0) {
+            ctx.globalAlpha = alpha;
+            await drawTexCentered(ctx, RING_OP_EXPRS[i], width * 0.7, height / 2 + i * 90, opsScale);
+            ctx.globalAlpha = 1;
+          }
         }
       }
     }
