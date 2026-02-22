@@ -29,23 +29,32 @@ const STORAGE_KEY = 'janim-cues';
 const defaults = new Map<string, number>(CUE_DEFS.map(c => [c.id, c.defaultTime]));
 const overrides = new Map<string, number>();
 
-// Load from localStorage on module init
-try {
-  const stored = localStorage.getItem(STORAGE_KEY);
-  if (stored) {
-    const obj = JSON.parse(stored) as Record<string, number>;
-    for (const [k, v] of Object.entries(obj)) {
-      if (defaults.has(k) && typeof v === 'number') {
-        overrides.set(k, v);
-      }
+function loadOverrides(obj: Record<string, number>): void {
+  for (const [k, v] of Object.entries(obj)) {
+    if (defaults.has(k) && typeof v === 'number') {
+      overrides.set(k, v);
     }
   }
-} catch { /* ignore */ }
+}
+
+// Load from cues.json (works in both Node and browser)
+try {
+  // Use a dynamic import with a variable to prevent Vite from bundling it
+  const jsonPath = '../cues.json';
+  const mod = await import(/* @vite-ignore */ jsonPath);
+  loadOverrides(mod.default ?? mod);
+} catch { /* ignore — file may not exist */ }
+
+// In browser, localStorage takes priority over cues.json
+try {
+  const stored = localStorage.getItem(STORAGE_KEY);
+  if (stored) loadOverrides(JSON.parse(stored));
+} catch { /* ignore — not in browser */ }
 
 function save(): void {
   const obj: Record<string, number> = {};
   for (const [k, v] of overrides) obj[k] = v;
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(obj));
+  try { localStorage.setItem(STORAGE_KEY, JSON.stringify(obj)); } catch { /* ignore */ }
 }
 
 export function getCue(id: string): number {

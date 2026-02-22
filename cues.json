@@ -1,0 +1,23 @@
+{
+  "anim-begin": 0.18909693519555124,
+  "anim-end": 127.1005856501945,
+  "scene-title": 0,
+  "scene-rings": 2.626221248361076,
+  "rings-labels": 3.3470817660751044,
+  "rings-polys": 5.9069387173447945,
+  "scene-hom": 16.665562917016167,
+  "hom-typeSig": 17.369801371505666,
+  "hom-constants": 26.325822457570997,
+  "hom-ringOps": 30.203886561533487,
+  "hom-mappings": 39.6062079886334,
+  "scene-param": 45.23670568841941,
+  "scene-param3d": 52.75176751856489,
+  "param3d-plotStart": 54.00168585957262,
+  "scene-duality": 63.77924991828015,
+  "duality-row2": 67.05547146444118,
+  "duality-row3": 74.35109326047196,
+  "duality-row4": 80.62122358859045,
+  "duality-uniformize": 91.87780756691298,
+  "duality-row5": 95.87986100400492,
+  "duality-fadeOut": 117.58107322591319
+}
