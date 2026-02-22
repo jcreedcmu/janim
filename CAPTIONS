@@ -29,20 +29,19 @@ a parameterized [!Param2D]
 [!Plot2D]
 curve in the plane.
 
-If we had three variables instead,
-we'd get parameterized curves in 3D space.
-
+The polynomials in t that f assigns to x and y say how to compute the x and y coordinates as a function of time.
 [!Param3D]
-
+And if instead we had asked about
 [!Plot3D]
+nice functions from R[x,y,z] to R[t],
+we'd find they correspond to parameterized curves in 3D space.
 
-So, we've seen that [!Duality] maps from R[x,y] to R[t] are  curves in the plane,
+
+So, we've seen that [!Duality] maps from R[x,y] to R[t] are curves in the plane,
 and [!Row2] maps from R[x,y,z] to R[t] give curves in 3D space.
-
 
 We can play around more with the the number of variables
 on both sides and see what happens.
-
 
 [!Row3] Maps from  R[x,y] to just R
 are mere points in the plane, because we can only assign constants to x and y.
@@ -56,8 +55,8 @@ If we [!Uniform] write these facts in a more uniform way, it's easier to
 see what the pattern is.
 
 [!Row5]
-Nice maps from n variables to p variables
-correspond to geometric maps from R^p to R^n.
+Nice algebraic maps from a ring with n variables to a ring with p variables
+correspond to geometric maps from the space R^p to the space R^n.
 
 [!Closing]
 The duality between algebra and geometry.

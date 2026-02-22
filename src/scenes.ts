@@ -419,7 +419,7 @@ function drawBezierArrow(
   ctx.fill();
 }
 
-export function dualityScene(cues: { row2: number; row3: number; row4: number; row5: number; uniformize: number; fadeOut: number }): SceneDraw {
+export function dualityScene(cues: { row2: number; row3: number; row4: number; uniformize: number; row5: number; fadeOut: number }): SceneDraw {
   return async (ctx, localT, { width, height, duration }) => {
     const sectionOut = 1 - easeInOut(timeSlice(localT, duration - FADE, duration));
     const rowScale = 2.8;
