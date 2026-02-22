@@ -145,6 +145,27 @@ interface SceneEntry {
   captions?: { start: number; end: number; text: string }[];
 }
 
+// Helper: build caption array from cue-aligned slots.
+// Each entry is [cueId, text]. The caption starts at that cue and ends at the
+// next entry's cue (or endCue for the last entry). Null text = no caption.
+function cc(
+  sceneCue: string,
+  entries: [string, string | null][],
+  endCue: string,
+): { start: number; end: number; text: string }[] {
+  const s = getCue(sceneCue);
+  const result: { start: number; end: number; text: string }[] = [];
+  for (let i = 0; i < entries.length; i++) {
+    const [cue, text] = entries[i];
+    if (text === null) continue;
+    const start = getCue(cue) - s;
+    const nextCue = i < entries.length - 1 ? entries[i + 1][0] : endCue;
+    const end = getCue(nextCue) - s;
+    result.push({ start, end, text });
+  }
+  return result;
+}
+
 export function buildTimeline(): SceneEntry[] {
   return [
     {
@@ -157,11 +178,11 @@ export function buildTimeline(): SceneEntry[] {
         labels: getCue('rings-labels') - getCue('scene-rings'),
         polys: getCue('rings-polys') - getCue('scene-rings'),
       }),
-      captions: [
-        { start: 0, end: 2, text: "Let's talk about real polynomial rings." },
-        { start: 2, end: 4.5, text: "The elements of a polynomial ring\nare all the polynomials we can write down" },
-        { start: 4.5, end: 7, text: "over a particular set of variables,\nwith real coefficients." },
-      ],
+      captions: cc('scene-rings', [
+        ['scene-rings', "Let's talk about real polynomial rings."],
+        ['rings-labels', "The elements of a polynomial ring\nare all the polynomials we can write down"],
+        ['rings-polys', "over a particular set of variables,\nwith real coefficients."],
+      ], 'scene-hom'),
     },
     {
       start: getCue('scene-hom'),
@@ -171,38 +192,33 @@ export function buildTimeline(): SceneEntry[] {
         ringOps: getCue('hom-ringOps') - getCue('scene-hom'),
         mappings: getCue('hom-mappings') - getCue('scene-hom'),
       }),
-      captions: [
-        { start: 0, end: 2.5, text: "What are the nice functions\nbetween these rings?" },
-        { start: 2.5, end: 4, text: "Let's consider an example." },
-        { start: 4, end: 6.5, text: "What are some nice functions\nfrom R[x,y] to R[t]?" },
-        { start: 6.5, end: 9, text: "I'm being intentionally a bit vague\nabout what \"nice\" means." },
-        { start: 9, end: 11.5, text: "Let's say that being a nice function means\nat least that you map any constant to itself." },
-        { start: 11.5, end: 14, text: "Let's also say that a nice function\nneeds to be a ring homomorphism:" },
-        { start: 14, end: 15.5, text: "it respects all the ring operations." },
-        { start: 15.5, end: 17.5, text: "In that case the only freedom we have left\nis deciding what x and y get mapped to," },
-        { start: 17.5, end: 19, text: "because once we decide that, everything else\nfollows from ring operation preservation." },
-        { start: 19, end: 20, text: "So a nice function from R[x,y] to R[t]\namounts to making only two choices:" },
-      ],
+      captions: cc('scene-hom', [
+        ['scene-hom', null],
+        ['hom-typeSig', "What are the nice functions\nfrom R[x,y] to R[t]?"],
+        ['hom-constants', "A nice function maps constants to themselves\nand is a ring homomorphism."],
+        ['hom-ringOps', "It respects all the ring operations."],
+        ['hom-mappings', "The only freedom left is deciding\nwhat x and y map to — two choices."],
+      ], 'scene-param'),
     },
     {
       start: getCue('scene-param'),
       draw: parametricScene({
         plotStart: getCue('param-plotStart') - getCue('scene-param'),
       }),
-      captions: [
-        { start: 0, end: 3.5, text: "Notice that this is the same thing as\ndescribing a parameterized curve in the plane." },
-        { start: 3.5, end: 7, text: "We're giving for each time t a polynomial function\nthat tells us what the x and y values should be at that time." },
-      ],
+      captions: cc('scene-param', [
+        ['scene-param', null],
+        ['param-plotStart', "This is the same thing as describing\na parameterized curve in the plane."],
+      ], 'scene-param3d'),
     },
     {
       start: getCue('scene-param3d'),
       draw: parametric3DScene({
         plotStart: getCue('param3d-plotStart') - getCue('scene-param3d'),
       }),
-      captions: [
-        { start: 0, end: 4, text: "If we had asked about nice functions\nfrom R[x,y,z] to R[t]," },
-        { start: 4, end: 8, text: "we would have found that they\nare parameterized curves in 3D space." },
-      ],
+      captions: cc('scene-param3d', [
+        ['scene-param3d', null],
+        ['param3d-plotStart', "If we had three variables instead,\nwe'd get parameterized curves in 3D space."],
+      ], 'scene-duality'),
     },
     {
       start: getCue('scene-duality'),
@@ -214,17 +230,15 @@ export function buildTimeline(): SceneEntry[] {
         uniformize: getCue('duality-uniformize') - getCue('scene-duality'),
         fadeOut: getCue('duality-fadeOut') - getCue('scene-duality'),
       }),
-      captions: [
-        { start: 0, end: 3, text: "So maps from R[x,y] to R[t] tell us\nhow to map a one-dimensional line into the two-dimensional plane," },
-        { start: 3, end: 5, text: "and maps from R[x,y,z] to R[t]\ntell us how to map a line into 3D space." },
-        { start: 5, end: 8, text: "It's a nice exercise to change the number of variables\non both sides of the function and see what happens." },
-        { start: 8, end: 11, text: "For example, maps from R[x,y] to just R are\nmere points in the plane," },
-        { start: 11, end: 13, text: "and maps from R[x,y,z] to R[t,u] are\ntwo-dimensional polynomial surfaces in 3D space." },
-        { start: 13, end: 15, text: "There's a general pattern happening here:" },
-        { start: 15, end: 17.5, text: "Algebraically nice maps from a ring with n variables\nto a ring with p variables correspond to" },
-        { start: 17.5, end: 19, text: "geometrically nice maps going the other direction,\nfrom p-dimensional space to n-dimensional space." },
-        { start: 19, end: 20, text: "This is a small tip of a deep iceberg:\nthe duality between algebra and geometry." },
-      ],
+      captions: cc('scene-duality', [
+        ['scene-duality', "Maps from R[x,y] to R[t] give curves in the plane,\nand maps from R[x,y,z] to R[t] give curves in 3D."],
+        ['duality-row2', "Try changing the number of variables\non both sides and see what happens."],
+        ['duality-row3', "Maps from R[x,y] to just R\nare mere points in the plane."],
+        ['duality-row4', "Maps from R[x,y,z] to R[t,u] are\npolynomial surfaces in 3D space."],
+        ['duality-row5', "There's a general pattern happening here."],
+        ['duality-uniformize', "Nice maps from n variables to p variables\ncorrespond to geometric maps from R^p to R^n."],
+        ['duality-fadeOut', "The duality between algebra and geometry."],
+      ], 'anim-end'),
     },
   ];
 }
