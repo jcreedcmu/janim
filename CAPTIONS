@@ -1,67 +1,61 @@
-[!BEGIN]
+[!BEGIN] [!Title] [!Rings]
+Let's talk about real polynomial rings. [!Labels]
 
-[!Title]
+The elements of a polynomial ring are all the polynomials we can write
+down [!Polys] over a particular set of variables, with real
+coefficients.
 
-[!Rings]
-Let's talk about real polynomial rings.
-
-[!Labels]
-The elements of a polynomial ring
-are all the polynomials we can write down
-
-[!Polys]
-over a particular set of variables,
-with real coefficients.
+We could ask: what are some nice functions
+between polynomial rings?
 
 [!Hom]
-
+For example,
 [!TypeSig]
-What are the nice functions
-from R[x,y] to R[t]?
+What are nice functions from R[x,y] to R[t]?
 
-[!Constants]
-A nice function maps constants to themselves
-and is a ring homomorphism.
+Well... I haven't said what "nice" means. Let's make some decisions about that.
 
-[!RingOps]
-It respects all the ring operations.
+We'll say a nice function f needs to map constants [!Constants] to themselves,
+and also needs to be a ring homomorphism. That is, it preserves [!RingOps]
+all ring operations, addition, subtraction, and multiplication.
 
-[!Mappings]
-The only freedom left is deciding
-what x and y map to — two choices.
+Given those constraints, our function is completely determined by
+what it does to x and y: f(x) is some polynomial [!Mappings]
+in t, and so is f(y).
 
-[!Param2D]
-
+and another way of looking at this is that our
+function is a description of
+a parameterized [!Param2D]
 [!Plot2D]
-This is the same thing as describing
-a parameterized curve in the plane.
+curve in the plane.
+
+If we had three variables instead,
+we'd get parameterized curves in 3D space.
 
 [!Param3D]
 
 [!Plot3D]
-If we had three variables instead,
-we'd get parameterized curves in 3D space.
 
-[!Duality]
-Maps from R[x,y] to R[t] give curves in the plane,
-and maps from R[x,y,z] to R[t] give curves in 3D.
+So, we've seen that [!Duality] maps from R[x,y] to R[t] are  curves in the plane,
+and [!Row2] maps from R[x,y,z] to R[t] give curves in 3D space.
 
-[!Row2]
-Try changing the number of variables
+
+We can play around more with the the number of variables
 on both sides and see what happens.
 
-[!Row3]
-Maps from R[x,y] to just R
-are mere points in the plane.
+
+[!Row3] Maps from  R[x,y] to just R
+are mere points in the plane, because we can only assign constants to x and y.
 
 [!Row4]
 Maps from R[x,y,z] to R[t,u] are
-polynomial surfaces in 3D space.
+polynomial surfaces in 3D space, because for each of x, y, and z, we give a polynomial
+for how those coordinates vary with the two "time coordinates" t and u.
+
+If we [!Uniform] write these facts in a more uniform way, it's easier to
+see what the pattern is.
 
 [!Row5]
-There's a general pattern happening here.
-
-[!Uniform]
 Nice maps from n variables to p variables
 correspond to geometric maps from R^p to R^n.
 

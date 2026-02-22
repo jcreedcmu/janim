@@ -155,28 +155,21 @@ function parseCaptions(raw: string): Map<string, string | null> {
   const map = new Map<string, string | null>();
   const foundLabels = new Set<string>();
 
-  let currentLabel: string | null = null;
-  let textLines: string[] = [];
+  // Split on [!Label] markers, keeping the labels as separate tokens
+  const parts = raw.split(/\[!(\w+)\]/);
+  // parts = [textBefore, label1, textAfter1, label2, textAfter2, ...]
 
-  function flush() {
-    if (currentLabel !== null) {
-      foundLabels.add(currentLabel);
-      const id = labelToId.get(currentLabel);
-      if (id) {
-        const text = textLines.join('\n').trim();
-        map.set(id, text || null);
-      } else {
-        console.warn(`CAPTIONS: unknown marker [!${currentLabel}]`);
-      }
+  for (let i = 1; i < parts.length; i += 2) {
+    const label = parts[i];
+    const text = (parts[i + 1] ?? '').trim();
+    foundLabels.add(label);
+    const id = labelToId.get(label);
+    if (id) {
+      map.set(id, text || null);
+    } else {
+      console.warn(`CAPTIONS: unknown marker [!${label}]`);
     }
   }
-
-  for (const line of raw.split('\n')) {
-    const m = line.match(/^\[!(\w+)\]\s*$/);
-    if (m) { flush(); currentLabel = m[1]; textLines = []; }
-    else { textLines.push(line); }
-  }
-  flush();
 
   for (const cue of CUE_DEFS) {
     if (!foundLabels.has(cue.label)) {
