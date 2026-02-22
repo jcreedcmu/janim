@@ -16,7 +16,9 @@ export const CUE_DEFS: CueDef[] = [
   { id: 'param3d-plotStart', defaultTime: 40.5, label: 'Plot3D' },
   { id: 'scene-duality', defaultTime: 50, label: 'Duality' },
   { id: 'duality-row2', defaultTime: 55, label: 'Row2' },
-  { id: 'duality-row3', defaultTime: 63, label: 'Row3' },
+  { id: 'duality-row3', defaultTime: 58, label: 'Row3' },
+  { id: 'duality-row4', defaultTime: 61, label: 'Row4' },
+  { id: 'duality-row5', defaultTime: 63, label: 'Row5' },
   { id: 'duality-fadeOut', defaultTime: 67, label: 'Closing' },
   { id: 'anim-end', defaultTime: 70, label: 'END' },
 ];

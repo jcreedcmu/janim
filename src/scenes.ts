@@ -398,12 +398,12 @@ function drawBezierArrow(
   ctx.fill();
 }
 
-export function dualityScene(cues: { row2: number; row3: number; fadeOut: number }): SceneDraw {
+export function dualityScene(cues: { row2: number; row3: number; row4: number; row5: number; fadeOut: number }): SceneDraw {
   return async (ctx, localT, { width, height, duration }) => {
     const sectionOut = 1 - easeInOut(timeSlice(localT, duration - FADE, duration));
     const rowScale = 2.8;
     const rowGap = 100;
-    const rowAppear = [0, cues.row2, cues.row3];
+    const rowAppear = [0, cues.row2, cues.row3, cues.row4, cues.row5];
     const tableFadeOut = cues.fadeOut;
 
     const tableOut = 1 - easeInOut(timeSlice(localT, tableFadeOut - 0.3, tableFadeOut));
@@ -418,7 +418,7 @@ export function dualityScene(cues: { row2: number; row3: number; fadeOut: number
       ctx.globalAlpha = alpha;
       const expr = DUALITY_ROWS[i];
       const size = tex.measure(expr);
-      const cy = height / 2 + (i - 1) * rowGap;
+      const cy = height / 2 + (i - 2) * rowGap;
 
       // Find the arrow marker and offset so it aligns at width/2
       const arrMarker = tex.markerPositions(expr, ['arr']).get('arr');
@@ -427,8 +427,8 @@ export function dualityScene(cues: { row2: number; row3: number; fadeOut: number
       const contentTop = cy - (size.height * rowScale) / 2;
       await tex.draw(ctx, expr, contentLeft, contentTop, rowScale);
 
-      // Bezier arrows on the general row (row 2) linking matching n's and p's
-      if (i === 2) {
+      // Bezier arrows on the general row (row 4) linking matching n's and p's
+      if (i === 4) {
         const markers = tex.markerPositions(expr, ['n1', 'p1', 'p2', 'n2']);
 
         const toCanvas = (id: string) => {
