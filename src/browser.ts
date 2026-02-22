@@ -128,7 +128,7 @@ function drawWaveform(peaks: Peaks, cvs: HTMLCanvasElement, currentT: number, an
   const bubbleMargin = BUBBLE_TOP_MARGIN * dpr;
   const waveTop = WAVEFORM_TOP_MARGIN * dpr;
   const waveH = h - waveTop;
-  ctx.fillStyle = '#222';
+  ctx.fillStyle = '#f0ece4';
   ctx.fillRect(0, 0, w, h);
 
   const playheadX = timeToX(currentT, w);
@@ -143,7 +143,7 @@ function drawWaveform(peaks: Peaks, cvs: HTMLCanvasElement, currentT: number, an
     const maxVal = Math.min(1, peaks.max[idx] * 3);
     const yMin = waveTop + ((1 - maxVal) / 2) * waveH;
     const yMax = waveTop + ((1 - minVal) / 2) * waveH;
-    ctx.fillStyle = px < playheadX ? '#e94560' : '#555';
+    ctx.fillStyle = px < playheadX ? '#6eb200' : '#bbb';
     ctx.fillRect(px, yMin, 1, yMax - yMin);
   }
 
@@ -152,7 +152,7 @@ function drawWaveform(peaks: Peaks, cvs: HTMLCanvasElement, currentT: number, an
 
   // Playhead line
   if (playheadX >= 0 && playheadX <= w) {
-    ctx.strokeStyle = '#fff';
+    ctx.strokeStyle = '#333';
     ctx.lineWidth = 2 * dpr;
     ctx.beginPath();
     ctx.moveTo(playheadX, waveTop);
@@ -288,9 +288,10 @@ async function init() {
     syncSeek(0);
   });
 
-  // Zoom on main canvas
+  // Zoom on main canvas (works anywhere in the content pane)
+  const contentPane = document.getElementById('content-pane')!;
   let zoom = 1;
-  canvas.addEventListener('wheel', (e) => {
+  contentPane.addEventListener('wheel', (e) => {
     e.preventDefault();
     const factor = e.deltaY < 0 ? 1.1 : 1 / 1.1;
     zoom = Math.max(0.25, Math.min(8, zoom * factor));

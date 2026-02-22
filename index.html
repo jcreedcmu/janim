@@ -47,9 +47,17 @@
       font-variant-numeric: tabular-nums;
       min-width: 150px;
     }
-    #canvas {
+    #content-pane {
       width: 100vw;
       height: calc(100vh - 230px);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      overflow: hidden;
+    }
+    #canvas {
+      width: 100%;
+      height: 100%;
       object-fit: contain;
     }
     #waveform-bar {
@@ -73,7 +81,9 @@
     <button id="play-pause">&#x23F8;&#xFE0E;</button>
     <span id="time-display">0.00s / 0.0s</span>
   </div>
-  <canvas id="canvas"></canvas>
+  <div id="content-pane">
+    <canvas id="canvas"></canvas>
+  </div>
   <audio id="audio" src="/audio/untitled.wav" preload="auto"></audio>
   <div id="waveform-bar">
     <canvas id="waveform"></canvas>
