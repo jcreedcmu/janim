@@ -170,11 +170,10 @@ export function homomorphismScene(cues: { typeSig: number; constants: number; ri
       const yBaselineY = height / 2 + 100;
 
       // Persistent prefixes: x ↦ and y ↦ (baseline-aligned)
+      // Stop drawing at duration — the param scene takes over seamlessly
       const prefixIn = easeInOut(timeSlice(localT, cues.mappings, cues.mappings + crossFade));
-      const prefixOut = 1 - easeInOut(timeSlice(localT, duration - FADE, duration));
-      const prefixAlpha = Math.min(prefixIn, prefixOut);
-      if (prefixAlpha > 0) {
-        ctx.globalAlpha = prefixAlpha;
+      if (prefixIn > 0 && localT < duration) {
+        ctx.globalAlpha = prefixIn;
         await tex.draw(ctx, TEX_X_MAPSTO, leftX, xBaselineY - xPrefixM.baseline * mapScale, mapScale);
         await tex.draw(ctx, TEX_Y_MAPSTO, leftX, yBaselineY - yPrefixM.baseline * mapScale, mapScale);
         ctx.globalAlpha = 1;
@@ -209,35 +208,55 @@ export function homomorphismScene(cues: { typeSig: number; constants: number; ri
 
 export function parametricScene(cues: { plotStart: number }): SceneDraw {
   return async (ctx, localT, { width, height, duration }) => {
-    const sectionIn = easeInOut(timeSlice(localT, cues.plotStart, cues.plotStart + FADE));
     const sectionOut = 1 - easeInOut(timeSlice(localT, duration - FADE, duration));
-    const sectionAlpha = Math.min(sectionIn, sectionOut);
 
-    if (sectionAlpha > 0) {
-      ctx.globalAlpha = sectionAlpha;
+    // --- Prefix block: slides from hom-scene center to param-scene left ---
+    const crossFade = 0.3;
+    const exampleDur = 2.5;
 
-      // Left side: formulas (~40% of width)
-      const mapScale = 2.5;
-      const crossFade = 0.3;
-      const exampleDur = 2.5;
-      const rhsGap = 15;
+    // Hom-scene layout (start position)
+    const homScale = 3.5;
+    const homRhsGap = 20;
+    const homXPrefixM = tex.measure(TEX_X_MAPSTO);
+    const homYPrefixM = tex.measure(TEX_Y_MAPSTO);
+    const homPrefixW = Math.max(homXPrefixM.width, homYPrefixM.width) * homScale;
+    const homMaxRhsW = Math.max(...ALL_RHS.map(e => tex.measure(e).width * homScale));
+    const homTotalW = homPrefixW + homRhsGap + homMaxRhsW;
+    const homLeftX = (width - homTotalW) / 2;
+    const homRowGap = 100;
 
-      const xPrefixM = tex.measure(TEX_X_MAPSTO);
-      const yPrefixM = tex.measure(TEX_Y_MAPSTO);
-      const prefixW = Math.max(xPrefixM.width, yPrefixM.width) * mapScale;
+    // Param-scene layout (end position)
+    const paramScale = 2.5;
+    const paramRhsGap = 15;
+    const paramLeftX = 400;
+    const paramRowGap = 80;
 
-      const leftMargin = 400;
-      const leftX = leftMargin;
-      const rhsX = leftX + prefixW + rhsGap;
+    // Animate from hom layout to param layout
+    const slideT = easeOutBack(timeSlice(localT, 0, cues.plotStart));
+    const curScale = lerp(homScale, paramScale, slideT);
+    const curLeftX = lerp(homLeftX, paramLeftX, slideT);
+    const curRowGap = lerp(homRowGap, paramRowGap, slideT);
+    const curRhsGap = lerp(homRhsGap, paramRhsGap, slideT);
 
-      const xBaselineY = height / 2;
-      const yBaselineY = height / 2 + 80;
+    const xPrefixM = tex.measure(TEX_X_MAPSTO);
+    const yPrefixM = tex.measure(TEX_Y_MAPSTO);
+    const prefixW = Math.max(xPrefixM.width, yPrefixM.width) * curScale;
+    const rhsX = curLeftX + prefixW + curRhsGap;
 
-      // Draw persistent prefixes
-      await tex.draw(ctx, TEX_X_MAPSTO, leftX, xBaselineY - xPrefixM.baseline * mapScale, mapScale);
-      await tex.draw(ctx, TEX_Y_MAPSTO, leftX, yBaselineY - yPrefixM.baseline * mapScale, mapScale);
+    const xBaselineY = height / 2;
+    const yBaselineY = height / 2 + curRowGap;
 
-      // Right side: plot area (~55% of width)
+    // Draw persistent prefixes (no fade-in, they persist from hom scene)
+    ctx.globalAlpha = sectionOut;
+    await tex.draw(ctx, TEX_X_MAPSTO, curLeftX, xBaselineY - xPrefixM.baseline * curScale, curScale);
+    await tex.draw(ctx, TEX_Y_MAPSTO, curLeftX, yBaselineY - yPrefixM.baseline * curScale, curScale);
+    ctx.globalAlpha = 1;
+
+    // --- Plot area: fades in at plotStart ---
+    const plotIn = easeInOut(timeSlice(localT, cues.plotStart, cues.plotStart + FADE));
+    const plotAlpha = Math.min(plotIn, sectionOut);
+
+    if (plotAlpha > 0) {
       const plotSize = 450;
       const plotRect: PlotRect = {
         x: width * 0.48,
@@ -246,8 +265,7 @@ export function parametricScene(cues: { plotStart: number }): SceneDraw {
         h: plotSize,
       };
 
-      // Draw axes at section alpha (consistent, not affected by per-curve crossfade)
-      ctx.globalAlpha = sectionAlpha;
+      ctx.globalAlpha = plotAlpha;
       await drawPlotAxes(ctx, plotRect, VIEWPORT, tex, X, Y);
 
       // Cycling through curves
@@ -262,7 +280,7 @@ export function parametricScene(cues: { plotStart: number }): SceneDraw {
         const fadeOut = (i < MAPPING_RHS.length - 1)
           ? 1 - easeInOut(timeSlice(localT, end - crossFade, end))
           : 1 - easeInOut(timeSlice(localT, duration - FADE, duration));
-        const alpha = Math.min(fadeIn, fadeOut) * sectionAlpha;
+        const alpha = Math.min(fadeIn, fadeOut) * plotAlpha;
 
         if (alpha > 0) {
           ctx.globalAlpha = alpha;
@@ -270,8 +288,8 @@ export function parametricScene(cues: { plotStart: number }): SceneDraw {
           // Draw RHS formulas
           const xM = tex.measure(xRhs);
           const yM = tex.measure(yRhs);
-          await tex.draw(ctx, xRhs, rhsX, xBaselineY - xM.baseline * mapScale, mapScale);
-          await tex.draw(ctx, yRhs, rhsX, yBaselineY - yM.baseline * mapScale, mapScale);
+          await tex.draw(ctx, xRhs, rhsX, xBaselineY - xM.baseline * curScale, curScale);
+          await tex.draw(ctx, yRhs, rhsX, yBaselineY - yM.baseline * curScale, curScale);
 
           // Draw curve
           drawParametricCurve(ctx, CURVES[i], plotRect, VIEWPORT);
