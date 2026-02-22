@@ -59,13 +59,13 @@ export const RING_OP_EXPRS = [
 
 // --- Parametric curve functions (parallel to MAPPING_RHS) ---
 export const CURVES: CurveDef[] = [
-  { xFn: t => t ** 3 + 1, yFn: t => t ** 2 - t, tRange: [-1.5, 1.5] },
-  { xFn: t => t, yFn: t => t ** 5 - t ** 4 + t ** 3 - t ** 2 + 3, tRange: [-1.2, 1.5] },
-  { xFn: t => 2 * t - 1, yFn: t => t ** 2, tRange: [-1.5, 1.5] },
-  { xFn: t => 0, yFn: t => t, tRange: [-3, 3] },
+  { xFn: t => t ** 3 + 1, yFn: t => t ** 2 - t, tRange: [-2, 2] },
+  { xFn: t => t, yFn: t => t ** 5 - t ** 4 + t ** 3 - t ** 2 + 3, tRange: [-1.35, 1.65] },
+  { xFn: t => 2 * t - 1, yFn: t => t ** 2, tRange: [-3, 3] },
+  { xFn: t => 0, yFn: t => t, tRange: [-9, 9] },
 ];
 
-export const VIEWPORT: Viewport = computeFixedViewport(CURVES);
+export const VIEWPORT: Viewport = { minX: -10, maxX: 10, minY: -10, maxY: 10 };
 
 // --- 3D mapping data ---
 export const Z = '{\\color{#6eb200}{z}}';
