@@ -9,7 +9,7 @@ import {
   TEX_Z_MAPSTO, MAPPING_RHS_3D, Z,
   CURVES_3D, VIEWPORT_3D,
   PROJ_AZIMUTH, PROJ_ELEVATION, PROJ_DISTANCE, PROJ_ROTATION_SPEED,
-  DUALITY_ROWS, DUALITY_CLOSING,
+  DUALITY_ROWS, DUALITY_ROWS_UNIFORM, DUALITY_CLOSING,
   N_COLOR, P_COLOR,
 } from './example.js';
 
@@ -398,13 +398,14 @@ function drawBezierArrow(
   ctx.fill();
 }
 
-export function dualityScene(cues: { row2: number; row3: number; row4: number; row5: number; fadeOut: number }): SceneDraw {
+export function dualityScene(cues: { row2: number; row3: number; row4: number; row5: number; uniformize: number; fadeOut: number }): SceneDraw {
   return async (ctx, localT, { width, height, duration }) => {
     const sectionOut = 1 - easeInOut(timeSlice(localT, duration - FADE, duration));
     const rowScale = 2.8;
     const rowGap = 100;
     const rowAppear = [0, cues.row2, cues.row3, cues.row4, cues.row5];
     const tableFadeOut = cues.fadeOut;
+    const uniformizeDur = 0.5;
 
     const tableOut = 1 - easeInOut(timeSlice(localT, tableFadeOut - 0.3, tableFadeOut));
 
@@ -412,39 +413,69 @@ export function dualityScene(cues: { row2: number; row3: number; row4: number; r
     for (let i = 0; i < DUALITY_ROWS.length; i++) {
       if (localT < rowAppear[i]) continue;
       const fadeIn = easeInOut(timeSlice(localT, rowAppear[i], rowAppear[i] + 0.3));
-      const alpha = Math.min(fadeIn, tableOut);
-      if (alpha <= 0) continue;
 
-      ctx.globalAlpha = alpha;
-      const expr = DUALITY_ROWS[i];
-      const size = tex.measure(expr);
       const cy = height / 2 + (i - 2) * rowGap;
 
-      // Find the arrow marker and offset so it aligns at width/2
-      const arrMarker = tex.markerPositions(expr, ['arr']).get('arr');
-      const arrowOffsetX = arrMarker ? arrMarker.x * rowScale : (size.width * rowScale) / 2;
-      const contentLeft = width / 2 - arrowOffsetX;
-      const contentTop = cy - (size.height * rowScale) / 2;
-      await tex.draw(ctx, expr, contentLeft, contentTop, rowScale);
+      // Crossfade from original to uniform version (rows 0-3 only; row 4 is already general)
+      const uniformT = i < 4 ? easeInOut(timeSlice(localT, cues.uniformize, cues.uniformize + uniformizeDur)) : 0;
+
+      // Draw original row (fading out during uniformize)
+      const origAlpha = Math.min(fadeIn, tableOut) * (1 - uniformT);
+      if (origAlpha > 0) {
+        ctx.globalAlpha = origAlpha;
+        const expr = DUALITY_ROWS[i];
+        const size = tex.measure(expr);
+        const arrMarker = tex.markerPositions(expr, ['arr']).get('arr');
+        const arrowOffsetX = arrMarker ? arrMarker.x * rowScale : (size.width * rowScale) / 2;
+        const contentLeft = width / 2 - arrowOffsetX;
+        const contentTop = cy - (size.height * rowScale) / 2;
+        await tex.draw(ctx, expr, contentLeft, contentTop, rowScale);
+      }
+
+      // Draw uniform row (fading in during uniformize)
+      if (uniformT > 0 && i < 4) {
+        const uAlpha = Math.min(fadeIn, tableOut) * uniformT;
+        if (uAlpha > 0) {
+          ctx.globalAlpha = uAlpha;
+          const uExpr = DUALITY_ROWS_UNIFORM[i];
+          const uSize = tex.measure(uExpr);
+          const uArrMarker = tex.markerPositions(uExpr, ['arr']).get('arr');
+          const uArrowOffsetX = uArrMarker ? uArrMarker.x * rowScale : (uSize.width * rowScale) / 2;
+          const uContentLeft = width / 2 - uArrowOffsetX;
+          const uContentTop = cy - (uSize.height * rowScale) / 2;
+          await tex.draw(ctx, uExpr, uContentLeft, uContentTop, rowScale);
+        }
+      }
 
       // Bezier arrows on the general row (row 4) linking matching n's and p's
       if (i === 4) {
-        const markers = tex.markerPositions(expr, ['n1', 'p1', 'p2', 'n2']);
+        const alpha = Math.min(fadeIn, tableOut);
+        if (alpha > 0) {
+          ctx.globalAlpha = alpha;
+          const expr = DUALITY_ROWS[i];
+          const size = tex.measure(expr);
+          const arrMarker = tex.markerPositions(expr, ['arr']).get('arr');
+          const arrowOffsetX = arrMarker ? arrMarker.x * rowScale : (size.width * rowScale) / 2;
+          const contentLeft = width / 2 - arrowOffsetX;
+          const contentTop = cy - (size.height * rowScale) / 2;
 
-        const toCanvas = (id: string) => {
-          const m = markers.get(id)!;
-          return { x: contentLeft + m.x * rowScale, y: contentTop + m.y * rowScale };
-        };
+          const markers = tex.markerPositions(expr, ['n1', 'p1', 'p2', 'n2']);
 
-        const NUDGEX = 10;
-        const NUDGEY = 25;
-        if (markers.has('n1') && markers.has('n2')) {
-          const a = toCanvas('n1'), b = toCanvas('n2');
-          drawBezierArrow(ctx, a.x + NUDGEX, a.y + NUDGEY, b.x + NUDGEX, b.y + NUDGEY, N_COLOR, 200);
-        }
-        if (markers.has('p1') && markers.has('p2')) {
-          const a = toCanvas('p1'), b = toCanvas('p2');
-          drawBezierArrow(ctx, a.x + NUDGEX, a.y + NUDGEY, b.x + NUDGEX, b.y + NUDGEY, P_COLOR, 100);
+          const toCanvas = (id: string) => {
+            const m = markers.get(id)!;
+            return { x: contentLeft + m.x * rowScale, y: contentTop + m.y * rowScale };
+          };
+
+          const NUDGEX = 10;
+          const NUDGEY = 25;
+          if (markers.has('n1') && markers.has('n2')) {
+            const a = toCanvas('n1'), b = toCanvas('n2');
+            drawBezierArrow(ctx, a.x + NUDGEX, a.y + NUDGEY, b.x + NUDGEX, b.y + NUDGEY, N_COLOR, 200);
+          }
+          if (markers.has('p1') && markers.has('p2')) {
+            const a = toCanvas('p1'), b = toCanvas('p2');
+            drawBezierArrow(ctx, a.x + NUDGEX, a.y + NUDGEY, b.x + NUDGEX, b.y + NUDGEY, P_COLOR, 100);
+          }
         }
       }
 

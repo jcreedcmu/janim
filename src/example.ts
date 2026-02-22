@@ -94,8 +94,15 @@ export const P_COLOR = '#00b2bb';
 const DUALITY_POINT = `\\mathbb{R}[${X},${Y}] \\to \\mathbb{R} \\quad\\cssId{arr}{\\longleftrightarrow}\\quad \\text{points in } \\mathbb{R}^2`;
 const DUALITY_SURFACE = `\\mathbb{R}[${X},${Y},${Z}] \\to \\mathbb{R}[${T},${U}] \\quad\\cssId{arr}{\\longleftrightarrow}\\quad \\text{polynomial surfaces in } \\mathbb{R}^3`;
 const DUALITY_GENERAL = `\\mathbb{R}[${X}_1,\\ldots,${X}_{\\cssId{n1}{${N}}}] \\to \\mathbb{R}[${T}_1,\\ldots,${T}_{\\cssId{p1}{${P}}}] \\quad\\cssId{arr}{\\longleftrightarrow}\\quad \\text{polynomial maps } \\mathbb{R}^{\\cssId{p2}{${P}}} \\to \\mathbb{R}^{\\cssId{n2}{${N}}}`;
+// Uniform versions: indexed variables on the left, R^p → R^n on the right
+const DUALITY_2D_U = `\\mathbb{R}[${X}_1,${X}_2] \\to \\mathbb{R}[${T}_1] \\quad\\cssId{arr}{\\longleftrightarrow}\\quad \\text{polynomial maps } \\mathbb{R}^1 \\to \\mathbb{R}^2`;
+const DUALITY_3D_U = `\\mathbb{R}[${X}_1,${X}_2,${X}_3] \\to \\mathbb{R}[${T}_1] \\quad\\cssId{arr}{\\longleftrightarrow}\\quad \\text{polynomial maps } \\mathbb{R}^1 \\to \\mathbb{R}^3`;
+const DUALITY_POINT_U = `\\mathbb{R}[${X}_1,${X}_2] \\to \\mathbb{R} \\quad\\cssId{arr}{\\longleftrightarrow}\\quad \\text{polynomial maps } \\mathbb{R}^0 \\to \\mathbb{R}^2`;
+const DUALITY_SURFACE_U = `\\mathbb{R}[${X}_1,${X}_2,${X}_3] \\to \\mathbb{R}[${T}_1,${T}_2] \\quad\\cssId{arr}{\\longleftrightarrow}\\quad \\text{polynomial maps } \\mathbb{R}^2 \\to \\mathbb{R}^3`;
+
 const DUALITY_CLOSING_EXPR = `\\text{algebra}^{\\text{op}} \\quad\\longleftrightarrow\\quad \\text{geometry}`;
 export const DUALITY_ROWS = [DUALITY_2D, DUALITY_3D, DUALITY_POINT, DUALITY_SURFACE, DUALITY_GENERAL];
+export const DUALITY_ROWS_UNIFORM = [DUALITY_2D_U, DUALITY_3D_U, DUALITY_POINT_U, DUALITY_SURFACE_U, DUALITY_GENERAL];
 export const DUALITY_CLOSING = DUALITY_CLOSING_EXPR;
 
 export const VIEWPORT_3D: Viewport = computeFixedViewport3D(
@@ -117,7 +124,7 @@ export async function setup(): Promise<void> {
     TEX_F_TYPE, ...CONST_EXPRS,
     TEX_X_MAPSTO, TEX_Y_MAPSTO, ...ALL_RHS, X, Y,
     TEX_Z_MAPSTO, Z, ...ALL_RHS_3D,
-    ...DUALITY_ROWS, DUALITY_CLOSING,
+    ...DUALITY_ROWS, ...DUALITY_ROWS_UNIFORM, DUALITY_CLOSING,
   ]);
 }
 
@@ -196,6 +203,7 @@ export function buildTimeline(): SceneEntry[] {
         row3: getCue('duality-row3') - getCue('scene-duality'),
         row4: getCue('duality-row4') - getCue('scene-duality'),
         row5: getCue('duality-row5') - getCue('scene-duality'),
+        uniformize: getCue('duality-uniformize') - getCue('scene-duality'),
         fadeOut: getCue('duality-fadeOut') - getCue('scene-duality'),
       }),
       captions: [
