@@ -294,16 +294,22 @@ function drawCC(
   ctx.textBaseline = 'bottom';
 
   const lineHeight = 44;
-  const padding = 12;
-  const boxHeight = lines.length * lineHeight + padding * 2;
+  const paddingX = 24;
+  const paddingY = 12;
+
+  const lineWidths = lines.map(l => ctx.measureText(l).width);
+  const maxLineW = Math.max(...lineWidths);
+  const boxWidth = maxLineW + paddingX * 2;
+  const boxHeight = lines.length * lineHeight + paddingY * 2;
+  const boxX = width / 2 - boxWidth / 2;
   const boxY = height - 80 - boxHeight;
 
   ctx.fillStyle = 'rgba(0, 0, 0, 0.7)';
-  ctx.fillRect(width / 2 - 600, boxY, 1200, boxHeight);
+  ctx.fillRect(boxX, boxY, boxWidth, boxHeight);
 
   ctx.fillStyle = '#fff';
   for (let i = 0; i < lines.length; i++) {
-    ctx.fillText(lines[i], width / 2, boxY + padding + (i + 1) * lineHeight);
+    ctx.fillText(lines[i], width / 2, boxY + paddingY + (i + 1) * lineHeight);
   }
 }
 

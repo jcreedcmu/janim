@@ -69,14 +69,22 @@ export async function drawPlotAxes(
   }
 
   const labelScale = 2.5;
+  const LABEL_OFFSET = 20; // extra px beyond axis tip
+
+  // X-axis label: beyond right tip of x-axis
   if (minY <= 0 && maxY >= 0) {
     const y0 = toCanvasY(0);
     const xm = texRenderer.measure(xLabel);
-    await texRenderer.draw(ctx, xLabel, plotRect.x + plotRect.w - xm.width * labelScale - 8, y0 - xm.height * labelScale - 4, labelScale);
+    const tipX = plotRect.x + plotRect.w;
+    await texRenderer.draw(ctx, xLabel, tipX + LABEL_OFFSET - xm.width * labelScale / 2, y0 - xm.height * labelScale / 2, labelScale);
   }
+
+  // Y-axis label: beyond top tip of y-axis
   if (minX <= 0 && maxX >= 0) {
     const x0 = toCanvasX(0);
-    await texRenderer.draw(ctx, yLabel, x0 + 6, plotRect.y + 4, labelScale);
+    const ym = texRenderer.measure(yLabel);
+    const tipY = plotRect.y;
+    await texRenderer.draw(ctx, yLabel, x0 - ym.width * labelScale / 2, tipY - LABEL_OFFSET - ym.height * labelScale / 2, labelScale);
   }
 }
 
@@ -169,17 +177,30 @@ export async function draw3DAxes(
   const labels = [xLabel, yLabel, zLabel];
   const labelScale = 2.5;
 
+  const LABEL_OFFSET = 20; // extra px beyond axis tip
+  const ocx = toCanvasX(ox);
+  const ocy = toCanvasY(oy);
+
   for (let i = 0; i < 3; i++) {
     const [px, py] = projection.project(...axes[i]);
+    const tipX = toCanvasX(px);
+    const tipY = toCanvasY(py);
     ctx.beginPath();
-    ctx.moveTo(toCanvasX(ox), toCanvasY(oy));
-    ctx.lineTo(toCanvasX(px), toCanvasY(py));
+    ctx.moveTo(ocx, ocy);
+    ctx.lineTo(tipX, tipY);
     ctx.stroke();
 
+    // Position label beyond the axis tip along the axis direction
+    const dx = tipX - ocx;
+    const dy = tipY - ocy;
+    const len = Math.sqrt(dx * dx + dy * dy);
+    const nx = len > 0 ? dx / len : 0;
+    const ny = len > 0 ? dy / len : 0;
+    const lx = tipX + nx * LABEL_OFFSET;
+    const ly = tipY + ny * LABEL_OFFSET;
+
     const m = texRenderer.measure(labels[i]);
-    const cx = toCanvasX(px);
-    const cy = toCanvasY(py);
-    await texRenderer.draw(ctx, labels[i], cx - m.width * labelScale / 2, cy - m.height * labelScale - 6, labelScale);
+    await texRenderer.draw(ctx, labels[i], lx - m.width * labelScale / 2, ly - m.height * labelScale / 2, labelScale);
   }
 }
 
