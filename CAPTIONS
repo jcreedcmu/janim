@@ -26,7 +26,6 @@ in t, and so is f(y).
 and another way of looking at this is that our
 function is a description of
 a parameterized [!Param2D]
-[!Plot2D]
 curve in the plane.
 
 The polynomials in t that f assigns to x and y say how to compute the x and y coordinates as a function of time.
@@ -35,7 +34,6 @@ And if instead we had asked about
 [!Plot3D]
 nice functions from R[x,y,z] to R[t],
 we'd find they correspond to parameterized curves in 3D space.
-
 
 So, we've seen that [!Duality] maps from R[x,y] to R[t] are curves in the plane,
 and [!Row2] maps from R[x,y,z] to R[t] give curves in 3D space.
@@ -55,10 +53,19 @@ If we [!Uniform] write these facts in a more uniform way, it's easier to
 see what the pattern is.
 
 [!Row5]
-Nice algebraic maps from a ring with n variables to a ring with p variables
-correspond to geometric maps from the space R^p to the space R^n.
+Nice algebraic maps from a ring with n variables to a ring with p
+variables correspond to geometric maps in the *other
+direction*, from p-dimensional space to n-dimensional space.
+
+So it's very tempting to say that R[x,y] "is" a two dimensional
+"space", and R[x,y,z] "is" a three-dimensional space and so on... except
+"backwards" or "upside down" in some sense, because the maps between
+them get turned around.
 
 [!Closing]
-The duality between algebra and geometry.
+This is a taste of a really deep and interesting theme that's at the
+heart of algebraic geometry, that algebra and geometry are in some
+sense *dual* to one another. I hope to make a few more little videos
+exploring this, stay tuned.
 
 [!END]

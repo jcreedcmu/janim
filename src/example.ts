@@ -2,12 +2,10 @@ import { AnimationConfig, AnimationFn, TexRenderer, easeInOut, timeSlice } from 
 import { CurveDef, computeFixedViewport, Viewport, CurveDef3D, createProjection, computeFixedViewport3D } from './plot.js';
 import { SceneDraw, titleScene, ringsScene, homomorphismScene, parametricScene, parametric3DScene, dualityScene } from './scenes.js';
 import { getCue, CUE_DEFS } from './cues.js';
-import captionsRaw from '../CAPTIONS?raw';
 
 export const TITLE = 'Seeing Upside-Down';
 export const SUBTITLE = 'a brief taste of algebraic geometry';
 export const FADE = 0.15;
-const SHOW_CC = true;
 
 // --- Colored variables ---
 const T = '{\\color{#3e8aff}{t}}';
@@ -180,11 +178,8 @@ function parseCaptions(raw: string): Map<string, string | null> {
   return map;
 }
 
-const captionMap = parseCaptions(captionsRaw);
-
-// Build caption array from cue-aligned slots. Each cue's text comes from the
-// parsed CAPTIONS file. Empty/missing text = no caption for that slot.
 function cc(
+  captionMap: Map<string, string | null>,
   sceneCue: string,
   cueIds: string[],
   endCue: string,
@@ -202,7 +197,8 @@ function cc(
   return result;
 }
 
-export function buildTimeline(): SceneEntry[] {
+export function buildTimeline(captionsRaw?: string): SceneEntry[] {
+  const captionMap = captionsRaw ? parseCaptions(captionsRaw) : null;
   return [
     {
       start: getCue('scene-title'),
@@ -214,9 +210,9 @@ export function buildTimeline(): SceneEntry[] {
         labels: getCue('rings-labels') - getCue('scene-rings'),
         polys: getCue('rings-polys') - getCue('scene-rings'),
       }),
-      captions: cc('scene-rings',
+      ...captionMap && { captions: cc(captionMap, 'scene-rings',
         ['scene-rings', 'rings-labels', 'rings-polys'],
-        'scene-hom'),
+        'scene-hom') },
     },
     {
       start: getCue('scene-hom'),
@@ -226,27 +222,25 @@ export function buildTimeline(): SceneEntry[] {
         ringOps: getCue('hom-ringOps') - getCue('scene-hom'),
         mappings: getCue('hom-mappings') - getCue('scene-hom'),
       }),
-      captions: cc('scene-hom',
+      ...captionMap && { captions: cc(captionMap, 'scene-hom',
         ['scene-hom', 'hom-typeSig', 'hom-constants', 'hom-ringOps', 'hom-mappings'],
-        'scene-param'),
+        'scene-param') },
     },
     {
       start: getCue('scene-param'),
-      draw: parametricScene({
-        plotStart: getCue('param-plotStart') - getCue('scene-param'),
-      }),
-      captions: cc('scene-param',
-        ['scene-param', 'param-plotStart'],
-        'scene-param3d'),
+      draw: parametricScene(),
+      ...captionMap && { captions: cc(captionMap, 'scene-param',
+        ['scene-param'],
+        'scene-param3d') },
     },
     {
       start: getCue('scene-param3d'),
       draw: parametric3DScene({
         plotStart: getCue('param3d-plotStart') - getCue('scene-param3d'),
       }),
-      captions: cc('scene-param3d',
+      ...captionMap && { captions: cc(captionMap, 'scene-param3d',
         ['scene-param3d', 'param3d-plotStart'],
-        'scene-duality'),
+        'scene-duality') },
     },
     {
       start: getCue('scene-duality'),
@@ -258,18 +252,24 @@ export function buildTimeline(): SceneEntry[] {
         row5: getCue('duality-row5') - getCue('scene-duality'),
         fadeOut: getCue('duality-fadeOut') - getCue('scene-duality'),
       }),
-      captions: cc('scene-duality',
+      ...captionMap && { captions: cc(captionMap, 'scene-duality',
         ['scene-duality', 'duality-row2', 'duality-row3', 'duality-row4', 'duality-uniformize', 'duality-row5', 'duality-fadeOut'],
-        'anim-end'),
+        'anim-end') },
     },
   ];
 }
 
+let _captionsRaw: string | undefined;
+
 export let TIMELINE: SceneEntry[] = buildTimeline();
+
+export function setCaptionsRaw(raw: string): void {
+  _captionsRaw = raw;
+}
 
 export function rebuildTimelineInPlace(): void {
   config.duration = getCue('anim-end') - getCue('anim-begin');
-  TIMELINE = buildTimeline();
+  TIMELINE = buildTimeline(_captionsRaw);
 }
 
 // ---------------------------------------------------------------------------
@@ -283,7 +283,6 @@ function drawCC(
   width: number,
   height: number,
 ) {
-  if (!SHOW_CC) return;
   const caption = captions.find(c => localT >= c.start && localT < c.end);
   if (!caption) return;
   const text = caption.text;

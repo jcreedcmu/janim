@@ -1,7 +1,8 @@
 /// <reference types="vite/client" />
 import { runInBrowser, AnimationController } from './janim.js';
-import { config, setup, animate, rebuildTimelineInPlace } from './example.js';
+import { config, setup, animate, rebuildTimelineInPlace, setCaptionsRaw } from './example.js';
 import { CUE_DEFS, getCue, setCue } from './cues.js';
+import captionsRaw from '../CAPTIONS?raw';
 
 const canvas = document.getElementById('canvas') as HTMLCanvasElement;
 const playPauseBtn = document.getElementById('play-pause') as HTMLButtonElement;
@@ -220,6 +221,8 @@ function syncSeek(t: number) {
 
 // --- Init ---
 async function init() {
+  setCaptionsRaw(captionsRaw);
+  rebuildTimelineInPlace();
   await setup();
 
   ctrl = runInBrowser(canvas, config, animate);
@@ -396,6 +399,7 @@ if (import.meta.hot) {
     const savedT = ctrl.currentTime();
     const wasPlaying = ctrl.isPlaying();
     if (wasPlaying) syncPause();
+    mod.setCaptionsRaw(captionsRaw);
     await mod.setup();
     mod.rebuildTimelineInPlace();
     ctrl.updateAnimation(mod.animate);

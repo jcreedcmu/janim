@@ -206,7 +206,9 @@ export function homomorphismScene(cues: { typeSig: number; constants: number; ri
   };
 }
 
-export function parametricScene(cues: { plotStart: number }): SceneDraw {
+export function parametricScene(): SceneDraw {
+  const SLIDE_DUR = 0.5; // seconds for the bouncy slide-in
+
   return async (ctx, localT, { width, height, duration }) => {
     const sectionOut = 1 - easeInOut(timeSlice(localT, duration - FADE, duration));
 
@@ -232,7 +234,7 @@ export function parametricScene(cues: { plotStart: number }): SceneDraw {
     const paramRowGap = 80;
 
     // Animate from hom layout to param layout
-    const slideT = easeOutBack(timeSlice(localT, 0, cues.plotStart));
+    const slideT = easeOutBack(timeSlice(localT, 0, SLIDE_DUR));
     const curScale = lerp(homScale, paramScale, slideT);
     const curLeftX = lerp(homLeftX, paramLeftX, slideT);
     const curRowGap = lerp(homRowGap, paramRowGap, slideT);
@@ -252,8 +254,8 @@ export function parametricScene(cues: { plotStart: number }): SceneDraw {
     await tex.draw(ctx, TEX_Y_MAPSTO, curLeftX, yBaselineY - yPrefixM.baseline * curScale, curScale);
     ctx.globalAlpha = 1;
 
-    // --- Plot area: fades in at plotStart ---
-    const plotIn = easeInOut(timeSlice(localT, cues.plotStart, cues.plotStart + FADE));
+    // --- Plot area: fades in after slide completes ---
+    const plotIn = easeInOut(timeSlice(localT, SLIDE_DUR, SLIDE_DUR + FADE));
     const plotAlpha = Math.min(plotIn, sectionOut);
 
     if (plotAlpha > 0) {
@@ -271,7 +273,7 @@ export function parametricScene(cues: { plotStart: number }): SceneDraw {
       // Cycling through curves
       for (let i = 0; i < MAPPING_RHS.length; i++) {
         const [xRhs, yRhs] = MAPPING_RHS[i];
-        const start = cues.plotStart + i * exampleDur;
+        const start = SLIDE_DUR + i * exampleDur;
         const end = start + exampleDur;
 
         if (localT < start || localT > end + crossFade) continue;

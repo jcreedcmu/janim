@@ -12,7 +12,6 @@ export const CUE_DEFS: CueDef[] = [
   { id: 'hom-ringOps', defaultTime: 18, label: 'RingOps' },
   { id: 'hom-mappings', defaultTime: 19.5, label: 'Mappings' },
   { id: 'scene-param', defaultTime: 30, label: 'Param2D' },
-  { id: 'param-plotStart', defaultTime: 30.5, label: 'Plot2D' },
   { id: 'scene-param3d', defaultTime: 40, label: 'Param3D' },
   { id: 'param3d-plotStart', defaultTime: 40.5, label: 'Plot3D' },
   { id: 'scene-duality', defaultTime: 50, label: 'Duality' },

@@ -8,9 +8,13 @@ FPS="${3:-30}"
 echo "==> Rendering frames to $OUTDIR ..."
 npx tsx src/render.ts "$OUTDIR"
 
+AUDIO="public/audio/untitled.wav"
+
 echo "==> Encoding $OUTPUT at ${FPS} fps ..."
 ffmpeg -y -framerate "$FPS" -i "$OUTDIR/frame_%05d.png" \
+  -i "$AUDIO" \
   -c:v libx264 -pix_fmt yuv420p -crf 18 \
+  -c:a aac -shortest \
   "$OUTPUT"
 
 echo "==> Done: $OUTPUT"
